@@ -15,6 +15,11 @@ import {
   TrainFront,
   Landmark,
   Radio,
+  BrainCircuit,
+  Activity,
+  ShieldAlert,
+  Users,
+  GitCompareArrows,
 } from "lucide-react";
 
 const items: Array<{
@@ -28,6 +33,11 @@ const items: Array<{
   { id: "planner", label: "Journey Planner", icon: Route },
   { id: "stations", label: "Stations", icon: Landmark },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "predictions", label: "AI Predictions", icon: BrainCircuit },
+  { id: "station-intelligence", label: "Station Intelligence", icon: Activity },
+  { id: "incidents", label: "Incident Center", icon: ShieldAlert },
+  { id: "coaches", label: "Coach Intelligence", icon: Users },
+  { id: "route-optimization", label: "Route Optimization", icon: GitCompareArrows },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -59,7 +69,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "railtrack-sidebar fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[#0B1220] px-5 py-6 shadow-2xl transition-transform duration-300 lg:static lg:translate-x-0 lg:shadow-none",
+          "railtrack-sidebar fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[#0B1220] px-5 py-6 shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -101,7 +111,7 @@ export function Sidebar() {
           Workspace
         </p>
 
-        <nav className="flex flex-1 flex-col gap-1">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {items.map((item) => {
             const Icon = item.icon;
             const active = view === item.id;

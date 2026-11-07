@@ -11,6 +11,11 @@ import { JourneyPlannerView } from "@/components/views/JourneyPlannerView";
 import { StationsView } from "@/components/views/StationsView";
 import { AnalyticsView } from "@/components/views/AnalyticsView";
 import { SettingsView } from "@/components/views/SettingsView";
+import { PredictionsView } from "@/components/views/PredictionsView";
+import { StationIntelligenceView } from "@/components/views/StationIntelligenceView";
+import { IncidentCenterView } from "@/components/views/IncidentCenterView";
+import { CoachIntelligenceView } from "@/components/views/CoachIntelligenceView";
+import { RouteOptimizationView } from "@/components/views/RouteOptimizationView";
 
 export function AppShell() {
   const { view } = useRailTrack();
@@ -35,6 +40,11 @@ export function AppShell() {
               {view === "planner" ? <JourneyPlannerView /> : null}
               {view === "stations" ? <StationsView /> : null}
               {view === "analytics" ? <AnalyticsView /> : null}
+              {view === "predictions" ? <PredictionsView /> : null}
+              {view === "station-intelligence" ? <StationIntelligenceView /> : null}
+              {view === "incidents" ? <IncidentCenterView /> : null}
+              {view === "coaches" ? <CoachIntelligenceView /> : null}
+              {view === "route-optimization" ? <RouteOptimizationView /> : null}
               {view === "settings" ? <SettingsView /> : null}
             </motion.div>
           </AnimatePresence>

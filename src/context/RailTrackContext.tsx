@@ -9,9 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { delayAlerts as seedAlerts, stations, trains as seedTrains } from "@/data/mock";
+import { delayAlerts as seedAlerts, seedIncidents, stations, trains as seedTrains } from "@/data/mock";
 import { currentAndNextStop, matchesQuery } from "@/lib/utils";
-import type { AppView, DelayAlert, Train, TrainStatus } from "@/types/railway";
+import type { AppView, DelayAlert, Incident, Train, TrainStatus } from "@/types/railway";
 
 export interface SettingsState {
   operatorName: string;
@@ -55,7 +55,13 @@ interface RailTrackContextValue {
   settings: SettingsState;
   updateSettings: (patch: Partial<SettingsState>) => void;
   clock: string;
+  incidents: Incident[];
+  addIncident: (incident: NewIncident) => string;
+  updateIncident: (id: string, patch: Partial<Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">>) => void;
+  advanceIncident: (id: string) => void;
 }
+
+type NewIncident = Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">;
 
 const RailTrackContext = createContext<RailTrackContextValue | null>(null);
 
@@ -70,6 +76,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [clock, setClock] = useState("18:42:11");
+  const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
 
   useEffect(() => {
     const tick = () => {
@@ -171,6 +178,58 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, ...patch }));
   }, []);
 
+  const addIncident = useCallback((incident: NewIncident) => {
+    const now = new Date().toISOString();
+    const id = `INC-${Date.now()}`;
+    setIncidents((current) => [
+      {
+        ...incident,
+        id,
+        status: "Reported",
+        createdAt: now,
+        updatedAt: now,
+        history: [{ timestamp: now, note: "Incident reported to the control room.", status: "Reported" }],
+      },
+      ...current,
+    ]);
+    return id;
+  }, []);
+
+  const updateIncident = useCallback((id: string, patch: Partial<Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">>) => {
+    const now = new Date().toISOString();
+    setIncidents((current) =>
+      current.map((incident) => incident.id === id && incident.status !== "Resolved"
+        ? {
+            ...incident,
+            ...patch,
+            updatedAt: now,
+            history: [...incident.history, {
+              timestamp: now,
+              note: "Incident details updated.",
+              status: incident.status,
+            }],
+          }
+        : incident),
+    );
+  }, []);
+
+  const advanceIncident = useCallback((id: string) => {
+    const workflow = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"] as const;
+    const now = new Date().toISOString();
+    setIncidents((current) =>
+      current.map((incident) => {
+        if (incident.id !== id || incident.status === "Resolved") return incident;
+        const status = workflow[Math.min(workflow.indexOf(incident.status) + 1, workflow.length - 1)];
+        return {
+          ...incident,
+          status,
+          updatedAt: now,
+          history: [...incident.history, { timestamp: now, note: `Status advanced to ${status}.`, status }],
+        };
+      }),
+    );
+  }, []);
+
   const value: RailTrackContextValue = {
     view,
     setView,
@@ -195,6 +254,10 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     settings,
     updateSettings,
     clock,
+    incidents,
+    addIncident,
+    updateIncident,
+    advanceIncident,
   };
 
   return <RailTrackContext.Provider value={value}>{children}</RailTrackContext.Provider>;

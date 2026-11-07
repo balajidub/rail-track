@@ -5,7 +5,12 @@ export type AppView =
   | "planner"
   | "stations"
   | "analytics"
-  | "settings";
+  | "settings"
+  | "predictions"
+  | "station-intelligence"
+  | "incidents"
+  | "coaches"
+  | "route-optimization";
 
 export type TrainStatus = "on-time" | "delayed" | "cancelled" | "arrived";
 
@@ -91,4 +96,94 @@ export interface PunctualityPoint {
 export interface CorridorDelay {
   corridor: string;
   minutes: number;
+}
+
+export type PredictionRisk = "Low" | "Medium" | "High" | "Critical";
+
+export interface DelayPrediction {
+  trainId: string;
+  riskScore: number;
+  risk: PredictionRisk;
+  predictedDelayMinutes: number;
+  confidence: number;
+  estimatedArrival: string;
+  factors: string[];
+  recommendation: string;
+  trend: Array<{ time: string; risk: number }>;
+}
+
+export type CongestionLevel = "Low" | "Moderate" | "High" | "Critical";
+
+export interface PlatformCongestion {
+  platform: number;
+  level: CongestionLevel;
+  densityPercent: number;
+  estimatedPassengers: number;
+  trainNumbers: string[];
+}
+
+export interface StationCongestion {
+  stationId: string;
+  level: CongestionLevel;
+  estimatedPassengers: number;
+  incomingTrains: number;
+  outgoingTrains: number;
+  platforms: PlatformCongestion[];
+}
+
+export type IncidentCategory =
+  | "Track obstruction"
+  | "Signal failure"
+  | "Technical failure"
+  | "Weather disruption"
+  | "Station overcrowding"
+  | "Unscheduled train stoppage";
+export type IncidentSeverity = "Low" | "Medium" | "High" | "Critical";
+export type IncidentPriority = "Routine" | "Elevated" | "Urgent";
+export type IncidentStatus =
+  | "Reported"
+  | "Acknowledged"
+  | "Response Assigned"
+  | "In Progress"
+  | "Resolved";
+
+export interface IncidentHistoryEntry {
+  timestamp: string;
+  note: string;
+  status: IncidentStatus;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  category: IncidentCategory;
+  severity: IncidentSeverity;
+  priority: IncidentPriority;
+  status: IncidentStatus;
+  trainId: string | null;
+  stationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  history: IncidentHistoryEntry[];
+}
+
+export type CoachOccupancyLevel = "Available" | "Moderate" | "High" | "Overcrowded";
+
+export interface CoachOccupancy {
+  coach: string;
+  occupancyPercent: number;
+  level: CoachOccupancyLevel;
+}
+
+export interface RouteAlternative {
+  id: string;
+  label: string;
+  waypointId: string | null;
+  durationMinutes: number;
+  predictedDelayMinutes: number;
+  affectedStations: number;
+  affectedTrains: string[];
+  rationale: string;
+  recommended: boolean;
 }
