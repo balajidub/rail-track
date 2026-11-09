@@ -84,7 +84,7 @@ export function Sidebar() {
               RailTrack
             </p>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
-              Operations Center
+              Real-Time Train Tracking and Live Status Visualization System
             </p>
           </div>
         </div>
@@ -147,15 +147,6 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <p className="text-xs font-semibold text-slate-200">
-            Railway Network
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
-            Educational prototype using simulated railway data.
-          </p>
-        </div>
       </aside>
     </>
   );
