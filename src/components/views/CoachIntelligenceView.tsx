@@ -1,11 +1,14 @@
 "use client";
 
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
+import { railTrackApi } from "@/lib/api";
 import { coachOccupancies } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
 import type { CoachOccupancy, CoachOccupancyLevel } from "@/types/railway";
-import { useMemo, useState } from "react";
+import { useApiResource } from "@/lib/useApiResource";
+import { useCallback, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -34,7 +37,20 @@ export function CoachIntelligenceView() {
   const [sortDescending, setSortDescending] = useState(true);
 
   const train = trains.find((item) => item.id === trainId) ?? trains[0];
-  const occupancy = useMemo(() => train ? coachOccupancies(train) : [], [train]);
+  const localOccupancy = useMemo(() => train ? coachOccupancies(train) : [], [train]);
+  const fetchOccupancy = useCallback(
+    () => railTrackApi.getTrainCoaches(train?.id ?? ""),
+    [train?.id],
+  );
+  const occupancyResource = useApiResource(
+    `train-coaches:${train?.id ?? "none"}`,
+    fetchOccupancy,
+    localOccupancy,
+    Boolean(train),
+  );
+  const occupancy = occupancyResource.status === "api" && occupancyResource.data.length > 0
+    ? occupancyResource.data
+    : localOccupancy;
   const filtered = occupancy.filter((coach) => levelFilter === "All" || coach.level === levelFilter)
     .sort((a, b) => sortDescending ? b.occupancyPercent - a.occupancyPercent : a.occupancyPercent - b.occupancyPercent);
   const selectedCoach = filtered.find((coach) => coach.coach === coachId) ?? occupancy.find((coach) => coach.coach === coachId) ?? filtered[0];
@@ -52,8 +68,12 @@ export function CoachIntelligenceView() {
       <header>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">V2 · coach intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Coach occupancy monitor</h1>
-        <p className="mt-1 text-sm text-slate-400">Coach-level percentages are deterministic estimates derived from each train’s mock occupancy. They are not booking or passenger records.</p>
+        <p className="mt-1 text-sm text-slate-400">Coach-level percentages are fictional simulation estimates, not booking or passenger records.</p>
       </header>
+      <ApiDataNotice status={occupancyResource.status} error={occupancyResource.error} />
+      {occupancyResource.status === "api" && occupancyResource.data.length === 0 ? (
+        <p role="status" className="text-xs text-slate-500">No backend coach records are seeded for this train; bundled demo estimates are shown.</p>
+      ) : null}
 
       <GlassCard className="grid gap-3 md:grid-cols-2">
         <label><span className="mb-2 block text-[10px] uppercase tracking-wider text-slate-500">Train</span>
@@ -71,7 +91,7 @@ export function CoachIntelligenceView() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Summary label="Average coach estimate" value={`${average}%`} />
         <Summary label="Overcrowded coaches" value={`${crowded} / ${occupancy.length}`} />
-        <Summary label="Train-level mock occupancy" value={`${train.occupancy}%`} />
+        <Summary label="Train-level simulated occupancy" value={`${train.occupancy}%`} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">

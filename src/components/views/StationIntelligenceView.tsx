@@ -1,15 +1,20 @@
 "use client";
 
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
+import { railTrackApi } from "@/lib/api";
 import { stationCongestion } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
-import type { CongestionLevel } from "@/types/railway";
+import type { CongestionLevel, StationCongestion as StationCongestionData } from "@/types/railway";
+import { useApiResource } from "@/lib/useApiResource";
 import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -48,8 +53,30 @@ export function StationIntelligenceView() {
     `${station.name} ${station.code} ${station.city} ${station.zone}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
   const selected = filtered.find(({ station }) => station.id === stationId) ?? filtered[0] ?? rows[0];
-  const selectedPlatform = selected?.congestion.platforms.find((platform) => platform.platform === platformId) ?? selected?.congestion.platforms[0];
-  const busiestPlatform = selected?.congestion.platforms.reduce(
+  const selectedStationId = selected?.station.id ?? "";
+  const fetchCongestion = () => railTrackApi.getStationCongestion(selectedStationId);
+  const fallbackCongestion = selected?.congestion ?? null;
+  const congestionResource = useApiResource(
+    `station-congestion:${selectedStationId}`,
+    fetchCongestion,
+    fallbackCongestion,
+    Boolean(selectedStationId),
+  );
+  const selectedCongestion =
+    congestionResource.status === "api" && congestionResource.data?.stationId === selectedStationId
+      ? congestionResource.data
+      : selected?.congestion;
+  const fetchHistory = () => railTrackApi.getStationCongestionHistory(selectedStationId, 12);
+  const fallbackHistory = selected ? [selected.congestion] : [];
+  const historyResource = useApiResource(
+    `station-congestion-history:${selectedStationId}`,
+    fetchHistory,
+    fallbackHistory,
+    Boolean(selectedStationId),
+  );
+  const selectedPlatform = selectedCongestion?.platforms.find((platform) => platform.platform === platformId)
+    ?? selectedCongestion?.platforms[0];
+  const busiestPlatform = selectedCongestion?.platforms.reduce(
     (busiest, platform) => platform.densityPercent > busiest.densityPercent ? platform : busiest,
   );
   const stationHistory = selected?.congestion.platforms.slice(0, 8).map((platform, index) => ({
@@ -58,6 +85,17 @@ export function StationIntelligenceView() {
     afternoon: Math.max(12, platform.densityPercent - (index * 5 + 6) % 18),
     current: platform.densityPercent,
   })) ?? [];
+  const apiHistory = historyResource.data
+    .filter((snapshot): snapshot is StationCongestionData & { recordedAt: string } => Boolean(snapshot.recordedAt))
+    .slice(0, 8)
+    .reverse()
+    .map((snapshot) => ({
+      time: new Date(snapshot.recordedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      activityScore: snapshot.activityScore ?? snapshot.platforms.reduce(
+        (total, platform) => total + platform.densityPercent,
+        0,
+      ) / Math.max(snapshot.platforms.length, 1),
+    }));
 
   const levelCounts = congestionLevels.map((level) => ({
     level,
@@ -71,6 +109,10 @@ export function StationIntelligenceView() {
         <h1 className="mt-1 text-3xl font-semibold text-white">Station congestion monitor</h1>
         <p className="mt-1 text-sm text-slate-400">Passenger counts and platform density are deterministic simulation estimates, not actual station measurements.</p>
       </header>
+      <div className="space-y-2">
+        <ApiDataNotice status={congestionResource.status} error={congestionResource.error} />
+        <ApiDataNotice status={historyResource.status} error={historyResource.error} />
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {levelCounts.map(({ level, count }) => (
@@ -112,12 +154,12 @@ export function StationIntelligenceView() {
             <GlassCard>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="font-mono text-xs text-cyan-300">{selected.station.code} · {selected.station.zone}</p><h2 className="mt-1 text-xl font-semibold text-white">{selected.station.name}</h2><p className="text-sm text-slate-400">{selected.station.city}, {selected.station.state} · {selected.station.platforms} platforms</p></div>
-                <span className={cn("rounded-full border px-3 py-1.5 text-xs", levelStyles[selected.congestion.level])}>{selected.congestion.level} estimate</span>
+                  <span className={cn("rounded-full border px-3 py-1.5 text-xs", levelStyles[selectedCongestion?.level ?? selected.congestion.level])}>{selectedCongestion?.level ?? selected.congestion.level} estimate</span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <Metric label="Est. passengers" value={`~${selected.congestion.estimatedPassengers.toLocaleString()}`} />
-                <Metric label="Incoming" value={String(selected.congestion.incomingTrains)} />
-                <Metric label="Outgoing" value={String(selected.congestion.outgoingTrains)} />
+                  <Metric label="Est. passengers" value={`~${(selectedCongestion?.estimatedPassengers ?? selected.congestion.estimatedPassengers).toLocaleString()}`} />
+                  <Metric label="Incoming" value={String(selectedCongestion?.incomingTrains ?? selected.congestion.incomingTrains)} />
+                  <Metric label="Outgoing" value={String(selectedCongestion?.outgoingTrains ?? selected.congestion.outgoingTrains)} />
               </div>
               {busiestPlatform && busiestPlatform.level !== "Low" ? (
                 <div role="alert" className={cn("mt-4 rounded-xl border p-3 text-sm", levelStyles[busiestPlatform.level])}>
@@ -128,7 +170,7 @@ export function StationIntelligenceView() {
               <div className="mt-5">
                 <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-medium text-white">Platform heatmap</h3><span className="text-[11px] text-slate-500">Select a platform for its simulated density</span></div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                  {selected.congestion.platforms.map((platform) => (
+                  {(selectedCongestion?.platforms ?? selected.congestion.platforms).map((platform) => (
                     <button key={platform.platform} type="button" aria-pressed={selectedPlatform?.platform === platform.platform} title={`Platform ${platform.platform}: ${platform.level} simulated congestion`} onClick={() => setPlatformId(platform.platform)}
                       className={cn("rounded-xl border p-2 text-center transition hover:brightness-125", heatStyles[platform.level], selectedPlatform?.platform === platform.platform && "ring-2 ring-white/80")}>
                       <p className="text-[11px] text-slate-300">PF {platform.platform}</p><p className="mt-1 text-sm font-semibold text-white">{platform.densityPercent}%</p>
@@ -142,25 +184,41 @@ export function StationIntelligenceView() {
                 <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-400">{congestionLevels.map((level) => <span key={level} className="flex items-center gap-1.5"><i className={cn("size-2 rounded-sm", heatStyles[level])} />{level}</span>)}</div>
               </div>
               <div className="mt-5 h-56">
-                <h3 className="mb-2 text-sm font-medium text-white">Illustrative congestion history</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stationHistory}>
-                    <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
-                    <XAxis dataKey="platform" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                    <Bar dataKey="morning" name="Morning" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="afternoon" name="Afternoon" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="current" name="Current estimate" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <h3 className="mb-2 text-sm font-medium text-white">
+                  {historyResource.status === "api" ? "Recorded congestion history" : "Illustrative congestion history"}
+                </h3>
+                {historyResource.status === "api" && apiHistory.length === 0 ? (
+                  <p className="text-xs text-slate-400">No historical snapshots are recorded for this station yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {historyResource.status === "api" ? (
+                      <LineChart data={apiHistory}>
+                        <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                        <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
+                        <Line type="monotone" dataKey="activityScore" name="Activity score" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 3 }} />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={stationHistory}>
+                        <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                        <XAxis dataKey="platform" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
+                        <Bar dataKey="morning" name="Morning" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="afternoon" name="Afternoon" fill="#22d3ee" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="current" name="Current estimate" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                )}
               </div>
             </GlassCard>
             <GlassCard>
               <h3 className="text-sm font-medium text-white">Suggested simulation actions</h3>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-                <li>• {selected.congestion.level === "Critical" || selected.congestion.level === "High" ? "Prioritize a platform-flow review and consider staggered boarding in this scenario." : "Continue routine platform monitoring in this scenario."}</li>
-                <li>• Check the arrival sequence for {selected.congestion.incomingTrains} simulated inbound services.</li>
+                <li>• {(selectedCongestion?.level ?? selected.congestion.level) === "Critical" || (selectedCongestion?.level ?? selected.congestion.level) === "High" ? "Prioritize a platform-flow review and consider staggered boarding in this scenario." : "Continue routine platform monitoring in this scenario."}</li>
+                <li>• Check the arrival sequence for {selectedCongestion?.incomingTrains ?? selected.congestion.incomingTrains} simulated inbound services.</li>
                 <li>• Coordinate station updates with the control desk before any real-world action.</li>
               </ul>
             </GlassCard>

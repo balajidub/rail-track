@@ -129,6 +129,8 @@ export interface StationCongestion {
   incomingTrains: number;
   outgoingTrains: number;
   platforms: PlatformCongestion[];
+  activityScore?: number;
+  recordedAt?: string;
 }
 
 export type IncidentCategory =
@@ -161,6 +163,7 @@ export interface Incident {
   severity: IncidentSeverity;
   priority: IncidentPriority;
   status: IncidentStatus;
+  responseTeam?: string | null;
   trainId: string | null;
   stationId: string | null;
   createdAt: string;
@@ -186,4 +189,5 @@ export interface RouteAlternative {
   affectedTrains: string[];
   rationale: string;
   recommended: boolean;
+  officiallyApproved?: boolean;
 }

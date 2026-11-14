@@ -1,10 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
+import { errorMessage, isBackendConfigured, railTrackApi, type SimulationStatus } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
 
 export function SettingsView() {
-  const { settings, updateSettings } = useRailTrack();
+  const { settings, updateSettings, refreshApiData } = useRailTrack();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const simulation = useApiResource<SimulationStatus | null>(
+    "simulation-status",
+    railTrackApi.getSimulationStatus,
+    null,
+    isBackendConfigured,
+  );
+
+  const runAction = async (action: string, operation: () => Promise<SimulationStatus>) => {
+    setPendingAction(action);
+    setActionError(null);
+    try {
+      simulation.setData(await operation());
+      await refreshApiData();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -69,10 +94,79 @@ export function SettingsView() {
       </div>
 
       <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium text-white">Backend demo simulation</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Controls the fictional Spring Boot simulation only; this is not connected to railway operations.
+            </p>
+          </div>
+          {simulation.data ? (
+            <span className={`rounded-full border px-2.5 py-1 text-xs ${simulation.data.running
+              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+              : "border-slate-400/20 bg-slate-400/10 text-slate-300"}`}>
+              {simulation.data.running ? "Running" : "Paused"}
+            </span>
+          ) : null}
+        </div>
+        {!isBackendConfigured ? (
+          <p className="mt-3 text-xs text-slate-400">
+            Set NEXT_PUBLIC_RAILTRACK_API_URL at build time to enable backend simulation controls.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3">
+              <ApiDataNotice status={simulation.status} error={simulation.error} />
+            </div>
+            {simulation.data ? (
+              <p className="mt-3 text-xs text-slate-400">
+                Simulated time: {new Date(simulation.data.simulatedAt).toLocaleString()} · mode: {simulation.data.mode}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!simulation.data || pendingAction !== null}
+                onClick={() => void runAction("start", railTrackApi.startSimulation)}
+                className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {pendingAction === "start" ? "Starting…" : "Start"}
+              </button>
+              <button
+                type="button"
+                disabled={!simulation.data || pendingAction !== null}
+                onClick={() => void runAction("pause", railTrackApi.pauseSimulation)}
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {pendingAction === "pause" ? "Pausing…" : "Pause"}
+              </button>
+              <button
+                type="button"
+                disabled={!simulation.data || pendingAction !== null}
+                onClick={() => void runAction("reset", railTrackApi.resetSimulation)}
+                className="rounded-xl border border-amber-400/20 px-3 py-2 text-xs text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {pendingAction === "reset" ? "Resetting…" : "Reset"}
+              </button>
+              <button
+                type="button"
+                disabled={pendingAction !== null}
+                onClick={simulation.refresh}
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Refresh status
+              </button>
+            </div>
+            {actionError ? <p role="alert" className="mt-3 text-xs text-rose-300">{actionError}</p> : null}
+          </>
+        )}
+      </GlassCard>
+
+      <GlassCard>
         <h2 className="text-sm font-medium text-white">Prototype notes</h2>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          RailTrack is a frontend-only command center. Every train, delay and chart uses fictional Indian railway data.
-          No live APIs, tickets or operational systems are connected.
+          RailTrack is a DEMO SIMULATION command center. Train, delay and passenger values are fictional; no live railway,
+          booking, or operational systems are connected.
         </p>
       </GlassCard>
     </div>

@@ -2,6 +2,7 @@
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRailTrack } from "@/context/RailTrackContext";
+import { errorMessage } from "@/lib/api";
 import { incidentSeverityColor } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
 import type { Incident, IncidentCategory, IncidentPriority, IncidentSeverity, IncidentStatus } from "@/types/railway";
@@ -72,6 +73,7 @@ export function IncidentCenterView() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<IncidentDraft>(emptyDraft);
   const [formError, setFormError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const filtered = useMemo(() => incidents.filter((incident) =>
     (statusFilter === "All" || incident.status === statusFilter) &&
@@ -91,7 +93,7 @@ export function IncidentCenterView() {
     setShowForm((open) => !open);
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = {
       title: draft.title.trim(),
@@ -106,15 +108,19 @@ export function IncidentCenterView() {
       setFormError("Add a title and description before saving.");
       return;
     }
-    if (editing && selected) {
-      updateIncident(selected.id, data);
-      setEditing(false);
-    } else {
-      const id = addIncident(data);
-      setSelectedId(id);
-      setShowForm(false);
+    try {
+      if (editing && selected) {
+        await updateIncident(selected.id, data);
+        setEditing(false);
+      } else {
+        const id = await addIncident(data);
+        setSelectedId(id);
+        setShowForm(false);
+      }
+      setFormError("");
+    } catch (error) {
+      setFormError(errorMessage(error));
     }
-    setFormError("");
   };
 
   const startEdit = (incident: Incident) => {
@@ -122,6 +128,16 @@ export function IncidentCenterView() {
     setEditing(true);
     setShowForm(true);
     setFormError("");
+    setActionError("");
+  };
+
+  const advanceSelectedIncident = async (id: string) => {
+    setActionError("");
+    try {
+      await advanceIncident(id);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    }
   };
 
   return (
@@ -130,7 +146,7 @@ export function IncidentCenterView() {
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">V2 · response workflow</p>
           <h1 className="mt-1 text-3xl font-semibold text-white">Incident management center</h1>
-          <p className="mt-1 text-sm text-slate-400">Fictional scenarios only. Incident changes remain in shared app state for this browser session.</p>
+          <p className="mt-1 text-sm text-slate-400">Fictional scenarios only. Changes are saved to the configured demo backend or retained in local demo state.</p>
         </div>
         <button type="button" onClick={beginCreate} className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2.5 text-sm font-medium text-slate-950">
           {showForm && !editing ? "Hide report form" : "＋ Report incident"}
@@ -197,6 +213,7 @@ export function IncidentCenterView() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <Info label="Linked train" value={trains.find((train) => train.id === selected.trainId)?.number ?? "None"} />
                 <Info label="Linked station" value={stations.find((station) => station.id === selected.stationId)?.name ?? "None"} />
+                <Info label="Response team" value={selected.responseTeam ?? "Not assigned"} />
                 <Info label="Created" value={formatTimestamp(selected.createdAt)} />
                 <Info label="Last updated" value={formatTimestamp(selected.updatedAt)} />
               </div>
@@ -213,9 +230,10 @@ export function IncidentCenterView() {
               {selected.status !== "Resolved" ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button type="button" onClick={() => startEdit(selected)} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 hover:bg-white/5">Edit incident</button>
-                  <button type="button" onClick={() => advanceIncident(selected.id)} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-medium text-slate-950">{selected.status === "In Progress" ? "Resolve incident" : `Advance to ${workflow[workflow.indexOf(selected.status) + 1]}`}</button>
+                  <button type="button" onClick={() => void advanceSelectedIncident(selected.id)} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-medium text-slate-950">{selected.status === "In Progress" ? "Resolve incident" : `Advance to ${workflow[workflow.indexOf(selected.status) + 1]}`}</button>
                 </div>
               ) : <p className="mt-4 text-xs text-emerald-300">Resolved · this scenario is closed.</p>}
+              {actionError ? <p role="alert" className="mt-3 text-xs text-rose-300">{actionError}</p> : null}
             </GlassCard>
             <GlassCard>
               <h3 className="text-sm font-medium text-white">Incident timeline</h3>

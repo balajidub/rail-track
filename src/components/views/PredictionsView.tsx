@@ -1,11 +1,14 @@
 "use client";
 
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
+import { railTrackApi } from "@/lib/api";
 import { predictTrainDelay } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
 import type { PredictionRisk } from "@/types/railway";
-import { useMemo, useState } from "react";
+import { useApiResource } from "@/lib/useApiResource";
+import { useCallback, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -32,11 +35,25 @@ export function PredictionsView() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const predictions = useMemo(
-    () => trains.map((train) => ({ train, prediction: predictTrainDelay(train, trains) }))
-      .sort((a, b) => b.prediction.riskScore - a.prediction.riskScore),
+  const localPredictions = useMemo(
+    () => trains.map((train) => predictTrainDelay(train, trains)),
     [trains],
   );
+  const fetchPredictions = useCallback(() => railTrackApi.getPredictions(), []);
+  const predictionResource = useApiResource("predictions", fetchPredictions, localPredictions);
+  const predictions = useMemo(() => {
+    const apiPredictions = new Map(
+      predictionResource.status === "api"
+        ? predictionResource.data.map((prediction) => [prediction.trainId, prediction])
+        : [],
+    );
+    return trains.map((train) => ({
+      train,
+      prediction: apiPredictions.get(train.id)
+        ?? localPredictions.find((prediction) => prediction.trainId === train.id)
+        ?? predictTrainDelay(train, trains),
+    })).sort((a, b) => b.prediction.riskScore - a.prediction.riskScore);
+  }, [localPredictions, predictionResource.data, predictionResource.status, trains]);
   const filtered = predictions.filter(({ train, prediction }) =>
     (riskFilter === "All" || prediction.risk === riskFilter) &&
     `${train.number} ${train.name}`.toLowerCase().includes(query.trim().toLowerCase()),
@@ -52,6 +69,10 @@ export function PredictionsView() {
           Transparent rule-based estimates from the simulated train feed. Not a trained AI model or live prediction.
         </p>
       </header>
+      <ApiDataNotice status={predictionResource.status} error={predictionResource.error} />
+      {predictionResource.status === "api" && predictionResource.data.length < trains.length ? (
+        <p className="text-xs text-slate-500">The backend seed covers a subset of trains; remaining bundled sample trains use local rule-based estimates.</p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {predictionRisks.map((risk) => {
@@ -106,7 +127,7 @@ export function PredictionsView() {
                 <Metric label="Predicted delay" value={`${selected.prediction.predictedDelayMinutes} min`} />
                 <Metric label="Estimated arrival" value={selected.prediction.estimatedArrival} />
                 <Metric label="Model confidence" value={`${selected.prediction.confidence}%`} />
-                <Metric label="Observed mock delay" value={`${selected.train.delayMinutes} min`} />
+                <Metric label="Observed simulated delay" value={`${selected.train.delayMinutes} min`} />
               </div>
               <div className="mt-5 h-52">
                 <p className="mb-2 text-xs uppercase tracking-wider text-slate-500">Illustrative risk trend</p>

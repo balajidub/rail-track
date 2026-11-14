@@ -9,9 +9,39 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { delayAlerts as seedAlerts, seedIncidents, stations, trains as seedTrains } from "@/data/mock";
+import { delayAlerts as seedAlerts, seedIncidents, stations as seedStations, trains as seedTrains } from "@/data/mock";
+import { errorMessage, isBackendConfigured, railTrackApi } from "@/lib/api";
 import { currentAndNextStop, matchesQuery } from "@/lib/utils";
-import type { AppView, DelayAlert, Incident, Train, TrainStatus } from "@/types/railway";
+import type { AppView, DelayAlert, Incident, Station, Train, TrainStatus } from "@/types/railway";
+
+type BackendStatus = "mock" | "loading" | "connected" | "partial" | "unavailable";
+type IncidentFields = Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">;
+type Settled<T> = { data: T; error: null } | { data: null; error: string };
+
+async function settle<T>(operation: () => Promise<T>): Promise<Settled<T>> {
+  try {
+    return { data: await operation(), error: null };
+  } catch (error) {
+    return { data: null, error: errorMessage(error) };
+  }
+}
+
+function mergeById<T extends { id: string }>(mock: T[], api: T[]): T[] {
+  const apiById = new Map(api.map((item) => [item.id, item]));
+  const mockIds = new Set(mock.map((item) => item.id));
+  return [
+    ...mock.map((item) => apiById.get(item.id) ?? item),
+    ...api.filter((item) => !mockIds.has(item.id)),
+  ];
+}
+
+function mergeIncidents(existing: Incident[], api: Incident[]): Incident[] {
+  const apiTitles = new Set(api.map((incident) => incident.title.trim().toLowerCase()));
+  return [
+    ...api,
+    ...existing.filter((incident) => !apiTitles.has(incident.title.trim().toLowerCase())),
+  ];
+}
 
 export interface SettingsState {
   operatorName: string;
@@ -35,7 +65,7 @@ interface RailTrackContextValue {
   view: AppView;
   setView: (view: AppView) => void;
   trains: Train[];
-  stations: typeof stations;
+  stations: Station[];
   selectedTrainId: string | null;
   selectedTrain: Train | undefined;
   selectTrain: (id: string | null) => void;
@@ -56,18 +86,20 @@ interface RailTrackContextValue {
   updateSettings: (patch: Partial<SettingsState>) => void;
   clock: string;
   incidents: Incident[];
-  addIncident: (incident: NewIncident) => string;
-  updateIncident: (id: string, patch: Partial<Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">>) => void;
-  advanceIncident: (id: string) => void;
+  addIncident: (incident: IncidentFields) => Promise<string>;
+  updateIncident: (id: string, patch: IncidentFields) => Promise<void>;
+  advanceIncident: (id: string) => Promise<void>;
+  backendStatus: BackendStatus;
+  backendError: string | null;
+  refreshApiData: () => Promise<void>;
 }
-
-type NewIncident = Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">;
 
 const RailTrackContext = createContext<RailTrackContextValue | null>(null);
 
 export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<AppView>("dashboard");
   const [liveTrains, setLiveTrains] = useState<Train[]>(seedTrains);
+  const [stationData, setStationData] = useState<Station[]>(seedStations);
   const [selectedTrainId, setSelectedTrainId] = useState<string | null>(seedTrains[0]?.id ?? null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TrainStatus>("all");
@@ -77,6 +109,62 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [clock, setClock] = useState("18:42:11");
   const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>(isBackendConfigured ? "loading" : "mock");
+  const [backendError, setBackendError] = useState<string | null>(null);
+
+  const refreshApiData = useCallback(async () => {
+    if (!isBackendConfigured) {
+      setBackendStatus("mock");
+      setBackendError(null);
+      setBackendConnected(false);
+      return;
+    }
+
+    setBackendStatus("loading");
+    const [trainResult, stationResult, incidentResult] = await Promise.all([
+      settle(railTrackApi.getTrains),
+      settle(railTrackApi.getStations),
+      settle(railTrackApi.getIncidents),
+    ]);
+
+    if (trainResult.data) {
+      setLiveTrains((current) => mergeById(current, trainResult.data));
+    }
+    if (stationResult.data) {
+      setStationData((current) => mergeById(current, stationResult.data));
+    }
+    if (incidentResult.data) {
+      setIncidents((current) => mergeIncidents(current, incidentResult.data));
+    }
+
+    const successes = [trainResult, stationResult, incidentResult].filter((result) => result.data !== null).length;
+    const errors = [trainResult, stationResult, incidentResult]
+      .flatMap((result) => result.error ? [result.error] : []);
+    setBackendConnected(trainResult.data !== null);
+    setBackendError(errors.length ? errors.join(" ") : null);
+    setBackendStatus(successes === 0 ? "unavailable" : errors.length ? "partial" : "connected");
+  }, []);
+
+  const refreshTrainsFromApi = useCallback(async () => {
+    const result = await settle(railTrackApi.getTrains);
+    if (result.error !== null) {
+      setBackendConnected(false);
+      setBackendStatus("unavailable");
+      setBackendError(result.error);
+      return;
+    }
+    setLiveTrains((current) => mergeById(current, result.data));
+    setBackendConnected(true);
+    setBackendStatus((status) => status === "partial" || backendError ? "partial" : "connected");
+  }, [backendError]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void refreshApiData();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [refreshApiData]);
 
   useEffect(() => {
     const tick = () => {
@@ -96,7 +184,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!settings.autoRefresh) return;
+    if (!settings.autoRefresh || backendConnected) return;
 
     const id = window.setInterval(() => {
       setLiveTrains((current) =>
@@ -130,7 +218,17 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     }, 2800);
 
     return () => window.clearInterval(id);
-  }, [settings.autoRefresh]);
+  }, [backendConnected, settings.autoRefresh]);
+
+  useEffect(() => {
+    if (!settings.autoRefresh || !backendConnected) return;
+    const id = window.setInterval(() => {
+      void refreshTrainsFromApi();
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [backendConnected, refreshTrainsFromApi, settings.autoRefresh]);
+
+  const stations = stationData;
 
   const trains = useMemo(
     () =>
@@ -151,7 +249,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
       const typeOk = typeFilter === "all" || train.type === typeFilter;
       return queryOk && statusOk && typeOk;
     });
-  }, [trains, query, statusFilter, typeFilter]);
+  }, [trains, stations, query, statusFilter, typeFilter]);
 
   const selectedTrain = useMemo(
     () => trains.find((train) => train.id === selectedTrainId),
@@ -178,7 +276,12 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, ...patch }));
   }, []);
 
-  const addIncident = useCallback((incident: NewIncident) => {
+  const addIncident = useCallback(async (incident: IncidentFields) => {
+    if (isBackendConfigured) {
+      const saved = await railTrackApi.createIncident(incident);
+      setIncidents((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      return saved.id;
+    }
     const now = new Date().toISOString();
     const id = `INC-${Date.now()}`;
     setIncidents((current) => [
@@ -195,7 +298,12 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
-  const updateIncident = useCallback((id: string, patch: Partial<Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">>) => {
+  const updateIncident = useCallback(async (id: string, patch: IncidentFields) => {
+    if (isBackendConfigured) {
+      const saved = await railTrackApi.updateIncident(id, patch);
+      setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
+      return;
+    }
     const now = new Date().toISOString();
     setIncidents((current) =>
       current.map((incident) => incident.id === id && incident.status !== "Resolved"
@@ -213,8 +321,17 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const advanceIncident = useCallback((id: string) => {
+  const advanceIncident = useCallback(async (id: string) => {
     const workflow = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"] as const;
+    const currentIncident = incidents.find((incident) => incident.id === id);
+    if (!currentIncident || currentIncident.status === "Resolved") return;
+    const nextStatus = workflow[workflow.indexOf(currentIncident.status) + 1];
+    if (!nextStatus) return;
+    if (isBackendConfigured) {
+      const saved = await railTrackApi.advanceIncident(id, nextStatus);
+      setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
+      return;
+    }
     const now = new Date().toISOString();
     setIncidents((current) =>
       current.map((incident) => {
@@ -228,7 +345,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
         };
       }),
     );
-  }, []);
+  }, [incidents]);
 
   const value: RailTrackContextValue = {
     view,
@@ -258,6 +375,9 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     addIncident,
     updateIncident,
     advanceIncident,
+    backendStatus,
+    backendError,
+    refreshApiData,
   };
 
   return <RailTrackContext.Provider value={value}>{children}</RailTrackContext.Provider>;
