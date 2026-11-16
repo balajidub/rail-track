@@ -7,7 +7,7 @@ export function DelayFeed() {
   const { alerts, markAlertRead, selectTrain, setView } = useRailTrack();
 
   if (alerts.length === 0) {
-    return <p className="py-5 text-sm text-slate-400">No backend delay records exceed the selected threshold.</p>;
+    return <p className="py-5 text-sm text-slate-400">No delay alerts exceed the selected threshold.</p>;
   }
 
   return (

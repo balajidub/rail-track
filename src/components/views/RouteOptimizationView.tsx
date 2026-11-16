@@ -34,14 +34,14 @@ export function RouteOptimizationView() {
   const stops = train?.stops.map((stop) => stationById(stations, stop.stationId)).filter((station) => station !== undefined) ?? [];
   const waypoint = selectedRoute?.waypointId ? stationById(stations, selectedRoute.waypointId) : undefined;
 
-  if (!train) return <GlassCard><p className="text-sm text-slate-400">No backend train records are available.</p></GlassCard>;
+  if (!train) return <GlassCard><p className="text-sm text-slate-400">No train records are available.</p></GlassCard>;
 
   return (
     <div className="space-y-5">
       <header>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Route intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Route scenario optimizer</h1>
-        <p className="mt-1 text-sm text-slate-400">Backend-generated route alternatives; not operational dispatch guidance.</p>
+        <p className="mt-1 text-sm text-slate-400">Compare corridor timing and alternate journey scenarios.</p>
       </header>
       <ApiDataNotice status={routeResource.status} error={routeResource.error} />
 
@@ -58,10 +58,10 @@ export function RouteOptimizationView() {
           <GlassCard>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="font-mono text-xs text-cyan-300">{train.number}</p><h2 className="mt-1 text-lg font-semibold text-white">{train.name}</h2><p className="text-sm text-slate-400">{stationById(stations, train.from)?.name} → {stationById(stations, train.to)?.name}</p></div>
-              <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-slate-300">{train.stops.length} listed stops</span>
+              <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-slate-300">{train.stops.length} stops</span>
             </div>
             <div className="mt-5 space-y-3">
-              {routes.length === 0 && routeResource.status === "api" ? <p className="text-sm text-slate-400">The backend returned no route alternatives for this train.</p> : null}
+              {routes.length === 0 && routeResource.status === "api" ? <p className="text-sm text-slate-400">No route alternatives are available for this train.</p> : null}
               {routes.map((route) => {
                 const total = route.durationMinutes + route.predictedDelayMinutes;
                 const width = Math.max(12, Math.round(total / Math.max(longest + Math.max(...routes.map((item) => item.predictedDelayMinutes)), 1) * 100));
@@ -70,7 +70,7 @@ export function RouteOptimizationView() {
                   <button key={route.id} type="button" onClick={() => setRouteId(route.id)} aria-pressed={active}
                     className={cn("w-full rounded-2xl border p-4 text-left transition", active ? "border-cyan-300/30 bg-cyan-300/[0.06]" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]")}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2"><h3 className="text-sm font-medium text-white">{route.label}</h3>{route.recommended ? <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[9px] uppercase tracking-wide text-emerald-300">Backend recommendation</span> : null}</div>
+                      <div className="flex items-center gap-2"><h3 className="text-sm font-medium text-white">{route.label}</h3>{route.recommended ? <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[9px] uppercase tracking-wide text-emerald-300">Recommended</span> : null}</div>
                       <span className="text-xs text-slate-400">{formatDuration(route.durationMinutes)} + {route.predictedDelayMinutes}m delay</span>
                     </div>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className={cn("h-full rounded-full transition-all", route.recommended ? "bg-emerald-400" : "bg-cyan-400")} style={{ width: `${width}%` }} /></div>
@@ -104,10 +104,7 @@ export function RouteOptimizationView() {
         {selectedRoute ? (
           <div className="space-y-5">
             <GlassCard>
-              <div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-cyan-300">Selected scenario</p><h2 className="mt-1 text-xl font-semibold text-white">{selectedRoute.label}</h2></div><span className={cn("rounded-full border px-2.5 py-1 text-xs", selectedRoute.recommended ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 text-slate-300")}>{selectedRoute.recommended ? "Backend recommendation" : "Comparison"}</span></div>
-              <p className="mt-3 rounded-lg border border-rose-400/20 bg-rose-400/[0.05] px-3 py-2 text-xs text-rose-200">
-                {selectedRoute.officiallyApproved ? "The API marks this route as officially approved." : "The API does not mark this route as officially approved."}
-              </p>
+              <div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-cyan-300">Selected scenario</p><h2 className="mt-1 text-xl font-semibold text-white">{selectedRoute.label}</h2></div><span className={cn("rounded-full border px-2.5 py-1 text-xs", selectedRoute.recommended ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 text-slate-300")}>{selectedRoute.recommended ? "Recommended" : "Comparison"}</span></div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <Metric label="Estimated journey" value={formatDuration(selectedRoute.durationMinutes)} />
                 <Metric label="Predicted delay" value={`${selectedRoute.predictedDelayMinutes} min`} />
@@ -118,7 +115,7 @@ export function RouteOptimizationView() {
                 <p className="text-xs uppercase tracking-wider text-cyan-200">Why this comparison</p>
                 <p className="mt-2 text-sm leading-6 text-slate-300">{selectedRoute.rationale}</p>
               </div>
-              <p className="mt-4 text-xs leading-5 text-slate-500">The recommendation comes from the configured backend route comparison. Verify operational routes independently before use.</p>
+              <p className="mt-4 text-xs leading-5 text-slate-500">Compare service timing and listed stops before choosing a route.</p>
             </GlassCard>
 
             <GlassCard>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRailTrack } from "@/context/RailTrackContext";
-import { errorMessage, isBackendConfigured, railTrackApi, type TrainSummaryResponse } from "@/lib/api";
+import { errorMessage, railTrackApi, type TrainSummaryResponse } from "@/lib/api";
 import {
   Bar,
   BarChart,
@@ -32,15 +32,6 @@ export function MiniAnalytics() {
   })) ?? [];
 
   const refreshSummary = useCallback(async () => {
-    if (!isBackendConfigured) {
-      setError(
-        "Backend URL is not configured. Set NEXT_PUBLIC_RAILTRACK_API_URL before building the frontend.",
-      );
-      setIsLoading(false);
-      setIsRefreshing(false);
-      return;
-    }
-
     const isInitialLoad = !hasAttemptedLoad.current;
     hasAttemptedLoad.current = true;
     setIsLoading(isInitialLoad);
@@ -61,7 +52,7 @@ export function MiniAnalytics() {
     const initialLoadId = window.setTimeout(() => {
       void refreshSummary();
     }, 0);
-    if (!settings.autoRefresh || !isBackendConfigured) {
+    if (!settings.autoRefresh) {
       return () => window.clearTimeout(initialLoadId);
     }
 
@@ -79,15 +70,15 @@ export function MiniAnalytics() {
       <section className="rounded-2xl border border-cyan-400/10 bg-[#08101f]/60 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-white">Java-generated train summary</p>
+            <p className="text-sm font-medium text-white">Train service summary</p>
             <p className="mt-1 text-xs text-slate-400">
-              Java API response · {settings.autoRefresh ? "refreshes every 10 seconds" : "manual refresh"}
+              {settings.autoRefresh ? "Refreshes every 10 seconds" : "Manual refresh"}
             </p>
           </div>
           <button
             type="button"
             onClick={() => void refreshSummary()}
-            disabled={isLoading || isRefreshing || !isBackendConfigured}
+            disabled={isLoading || isRefreshing}
             className="rounded-lg border border-cyan-400/20 px-3 py-1.5 text-xs text-cyan-200 transition hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? "Loading…" : isRefreshing ? "Refreshing…" : "Refresh"}
@@ -96,7 +87,7 @@ export function MiniAnalytics() {
 
         {error ? (
           <p role="alert" className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3 py-2 text-xs text-amber-200">
-            {error}{summary ? " Showing the last successful backend response." : ""}
+            {error}{summary ? " Showing the last successful response." : ""}
           </p>
         ) : null}
 
@@ -149,7 +140,7 @@ export function MiniAnalytics() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-slate-400">The backend returned no valid train records.</p>
+                <p className="text-sm text-slate-400">No valid train records are available.</p>
               )}
             </div>
           </>
@@ -158,7 +149,7 @@ export function MiniAnalytics() {
 
       {summary ? (
         <div className="h-56">
-          <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-500">Recorded delay by train · Java API</p>
+          <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-500">Recorded delay by train</p>
           {delayData.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={delayData}>

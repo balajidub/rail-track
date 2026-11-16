@@ -35,7 +35,7 @@ export function JourneyPlannerView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Journey planner</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Plan a corridor hop</h1>
-        <p className="mt-1 text-sm text-slate-400">Search scheduled stops in backend train records. Ticket availability is not provided.</p>
+        <p className="mt-1 text-sm text-slate-400">Search train schedules between stations.</p>
       </div>
 
       <GlassCard>
@@ -86,12 +86,12 @@ export function JourneyPlannerView() {
           <GlassCard>
             <p className="text-sm text-slate-400">
               {!stations.length
-                ? "No backend station records are available."
+                ? "No stations are available."
                 : !trains.length
-                  ? "No backend train schedule records are available."
+                  ? "No train schedules are available."
                   : submitted
-                    ? "No backend train record connects these stations in this direction."
-                    : "Choose two stations to search the available backend schedules."}
+                    ? "No train connects these stations in this direction."
+                    : "Choose two stations to search available schedules."}
             </p>
           </GlassCard>
         ) : (

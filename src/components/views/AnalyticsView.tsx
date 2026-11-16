@@ -56,9 +56,7 @@ export function AnalyticsView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Analytics</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Network performance</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Current backend records only. Historical and hourly trend data are not provided.
-        </p>
+        <p className="mt-1 text-sm text-slate-400">Train status and delay performance across the network.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -69,7 +67,7 @@ export function AnalyticsView() {
 
       {trains.length === 0 ? (
         <GlassCard>
-          <p className="text-sm text-slate-400">No backend train records are available for analytics.</p>
+          <p className="text-sm text-slate-400">No train records are available for analytics.</p>
         </GlassCard>
       ) : (
         <div className="grid gap-5 xl:grid-cols-2">
@@ -105,7 +103,7 @@ export function AnalyticsView() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <p className="text-sm text-slate-400">No positive delays are recorded in the current backend response.</p>
+              <p className="text-sm text-slate-400">No positive delays are recorded.</p>
             )}
           </GlassCard>
 

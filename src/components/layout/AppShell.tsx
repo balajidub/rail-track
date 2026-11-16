@@ -18,13 +18,18 @@ import { CoachIntelligenceView } from "@/components/views/CoachIntelligenceView"
 import { RouteOptimizationView } from "@/components/views/RouteOptimizationView";
 
 export function AppShell() {
-  const { view } = useRailTrack();
+  const { view, dataError } = useRailTrack();
 
   return (
     <div className="flex min-h-screen bg-[#070B14] text-slate-100">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav />
+        {dataError ? (
+          <div role="alert" className="border-b border-rose-400/20 bg-rose-400/[0.05] px-4 py-2 text-xs text-rose-200 lg:px-6">
+            Could not refresh service data: {dataError}
+          </div>
+        ) : null}
         <main className="flex-1 overflow-y-auto px-4 py-5 lg:px-6 lg:py-6">
           <AnimatePresence mode="wait">
             <motion.div

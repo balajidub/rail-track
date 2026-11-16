@@ -47,10 +47,7 @@ export function Sidebar() {
     sidebarOpen,
     setSidebarOpen,
     trains,
-    backendStatus,
   } = useRailTrack();
-
-  const hasBackendRecords = backendStatus === "connected" || backendStatus === "partial";
 
   return (
     <>
@@ -85,16 +82,14 @@ export function Sidebar() {
         <div className="mb-7 rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
           <div className="flex items-center gap-2 text-cyan-300">
             <Activity className="size-4" />
-            <span className="text-xs font-bold uppercase tracking-wider">
-              Backend records
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider">Train services</span>
           </div>
 
           <p className="mt-2 text-2xl font-bold text-white">
-            {hasBackendRecords ? trains.length : "—"}
+            {trains.length}
           </p>
           <p className="text-xs text-slate-400">
-            {hasBackendRecords ? "Train records returned" : "Backend data unavailable"}
+            {trains.length === 1 ? "Service in the network" : "Services in the network"}
           </p>
         </div>
 

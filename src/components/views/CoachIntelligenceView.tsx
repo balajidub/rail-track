@@ -70,14 +70,14 @@ export function CoachIntelligenceView() {
   const crowded = occupancy.filter((coach) => coach.level === "Overcrowded").length;
   const chartData = occupancy.slice(0, 12);
 
-  if (!train) return <GlassCard><p className="text-sm text-slate-400">No backend train records are available.</p></GlassCard>;
+  if (!train) return <GlassCard><p className="text-sm text-slate-400">No train records are available.</p></GlassCard>;
 
   return (
     <div className="space-y-5">
       <header>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Coach intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Coach occupancy monitor</h1>
-        <p className="mt-1 text-sm text-slate-400">Backend occupancy estimates may be simulation-derived; no ticketing or passenger feed is connected.</p>
+        <p className="mt-1 text-sm text-slate-400">Review coach-level occupancy profiles and compare services.</p>
       </header>
       <ApiDataNotice status={occupancyResource.status} error={occupancyResource.error} />
       {comparisonTrain ? (
@@ -101,9 +101,9 @@ export function CoachIntelligenceView() {
       </GlassCard>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Summary label="Average backend coach estimate" value={average === null ? "—" : `${average}%`} />
+        <Summary label="Average coach occupancy" value={average === null ? "—" : `${average}%`} />
         <Summary label="Overcrowded coaches" value={occupancy.length ? `${crowded} / ${occupancy.length}` : "—"} />
-        <Summary label="Train-level backend record" value={`${train.occupancy}%`} />
+        <Summary label="Train occupancy" value={`${train.occupancy}%`} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -139,11 +139,11 @@ export function CoachIntelligenceView() {
                     <XAxis dataKey="coach" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                    <Bar dataKey="occupancyPercent" name="Backend estimate %" fill="#22d3ee" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="occupancyPercent" name="Occupancy %" fill="#22d3ee" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            ) : <p className="mt-4 text-sm text-slate-400">No backend coach occupancy records are available to chart.</p>}
+            ) : <p className="mt-4 text-sm text-slate-400">No coach occupancy records are available to chart.</p>}
             {occupancy.length > 12 ? <p className="mt-2 text-[10px] text-slate-500">Chart shows the first 12 coaches; all coaches remain selectable above.</p> : null}
           </GlassCard>
         </div>
@@ -162,9 +162,9 @@ export function CoachIntelligenceView() {
                   <CompareBar label={train.name} value={average} color="bg-cyan-400" />
                   <CompareBar label={comparisonTrain.name} value={comparisonAverage} color="bg-blue-400" />
                 </div>
-                <p className="mt-4 text-xs leading-5 text-slate-500">Both values are backend estimates, not ticketing or reservation records.</p>
+                <p className="mt-4 text-xs leading-5 text-slate-500">Compare occupancy levels across the two selected services.</p>
               </>
-            ) : <p className="mt-3 text-sm text-slate-400">{comparisonTrain ? "Backend occupancy records are unavailable for one or both trains." : "No second backend train record is available to compare."}</p>}
+            ) : <p className="mt-3 text-sm text-slate-400">{comparisonTrain ? "Occupancy details are unavailable for one or both trains." : "No second train is available to compare."}</p>}
           </GlassCard>
         </div>
       </div>
@@ -183,7 +183,7 @@ function CoachDetail({ coach, trainName }: { coach: CoachOccupancy; trainName: s
     <div className="flex items-start justify-between"><div><p className="font-mono text-cyan-300">{coach.coach}</p><p className="mt-1 text-sm text-slate-400">{trainName}</p></div><span className={cn("rounded-full border px-2 py-1 text-[10px]", levelStyles[coach.level])}>{coach.level}</span></div>
     <p className="mt-5 text-4xl font-semibold text-white">{coach.occupancyPercent}<span className="text-lg text-slate-500">%</span></p>
     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className={cn("h-full rounded-full", coach.level === "Overcrowded" ? "bg-rose-400" : coach.level === "High" ? "bg-amber-400" : coach.level === "Moderate" ? "bg-sky-400" : "bg-emerald-400")} style={{ width: `${coach.occupancyPercent}%` }} /></div>
-    <p className="mt-4 text-xs leading-5 text-slate-400">Backend occupancy estimate; it is not an observed passenger count.</p>
+    <p className="mt-4 text-xs leading-5 text-slate-400">Estimated occupancy for this coach.</p>
   </div>;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRailTrack } from "@/context/RailTrackContext";
+import { isBackendConfigured } from "@/lib/api";
 import { Bell, Menu, Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,6 +18,7 @@ export function TopNav() {
     markAllRead,
     clock,
     settings,
+    dataError,
   } = useRailTrack();
   const [open, setOpen] = useState(false);
   const operatorName = settings.operatorName.trim() || "Operator";
@@ -56,6 +58,16 @@ export function TopNav() {
         IST {clock || "--:--:--"}
       </div>
 
+      {!isBackendConfigured ? (
+        <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-2 py-2 text-[10px] text-amber-200 sm:px-3 sm:text-xs">
+          Preview data
+        </div>
+      ) : dataError ? (
+        <div role="alert" className="rounded-2xl border border-rose-400/20 bg-rose-400/5 px-2 py-2 text-[10px] text-rose-200 sm:px-3 sm:text-xs">
+          Data update failed
+        </div>
+      ) : null}
+
       <div className="relative">
         <button
           type="button"
@@ -87,7 +99,7 @@ export function TopNav() {
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {alerts.length === 0 ? (
-                  <p className="px-4 py-5 text-sm text-slate-400">No matching backend delay records.</p>
+                  <p className="px-4 py-5 text-sm text-slate-400">No matching delay alerts.</p>
                 ) : (
                   alerts.slice(0, 6).map((alert) => (
                     <button

@@ -36,7 +36,7 @@ export function DashboardView() {
           <div className="flex items-center justify-between px-5 py-4">
             <div>
               <p className="text-sm font-medium text-white">Train locations</p>
-              <p className="text-xs text-slate-400">Last reported station from backend records</p>
+              <p className="text-xs text-slate-400">Train positions across the network</p>
             </div>
           </div>
           <RailwayMap />

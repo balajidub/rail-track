@@ -15,9 +15,7 @@ export function LiveTrackingView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Train map</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Train locations</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Last reported stations from backend records; no external live positioning feed is configured.
-        </p>
+        <p className="mt-1 text-sm text-slate-400">Service positions and route progress across the network.</p>
       </div>
 
       <GlassCard className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
@@ -45,7 +43,7 @@ export function LiveTrackingView() {
           ))}
         </select>
         <p className="text-xs text-slate-400" aria-live="polite">
-          {filteredTrains.length} of {trains.length} backend train records
+          {filteredTrains.length} of {trains.length} train services
         </p>
       </GlassCard>
 

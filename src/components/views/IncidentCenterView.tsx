@@ -2,7 +2,7 @@
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRailTrack } from "@/context/RailTrackContext";
-import { errorMessage, isBackendConfigured } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Incident, IncidentCategory, IncidentPriority, IncidentSeverity, IncidentStatus } from "@/types/railway";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -151,9 +151,9 @@ export function IncidentCenterView() {
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Response workflow</p>
           <h1 className="mt-1 text-3xl font-semibold text-white">Incident management center</h1>
-          <p className="mt-1 text-sm text-slate-400">Backend incident records. Reports save to RailTrack only and are not sent to railway operators.</p>
+          <p className="mt-1 text-sm text-slate-400">Review and manage incidents across the network.</p>
         </div>
-        <button type="button" onClick={beginCreate} disabled={!isBackendConfigured} className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2.5 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="button" onClick={beginCreate} className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2.5 text-sm font-medium text-slate-950">
           {showForm && !editing ? "Hide report form" : "＋ Report incident"}
         </button>
       </header>
@@ -167,7 +167,7 @@ export function IncidentCenterView() {
       {showForm ? (
         <GlassCard>
           <div className="flex items-start justify-between gap-3">
-            <div><h2 className="text-base font-medium text-white">{editing ? "Edit incident" : "Report incident"}</h2><p className="mt-1 text-xs text-slate-400">Changes are saved to the configured backend only.</p></div>
+            <div><h2 className="text-base font-medium text-white">{editing ? "Edit incident" : "Report incident"}</h2><p className="mt-1 text-xs text-slate-400">Update the incident record and response status.</p></div>
             <button type="button" onClick={() => { setShowForm(false); setEditing(false); }} className="text-xs text-slate-400 hover:text-white">Cancel</button>
           </div>
           <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -193,7 +193,7 @@ export function IncidentCenterView() {
             <select id="incident-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as "updated" | "severity")} className="select-field"><option value="updated">Recently updated</option><option value="severity">Highest severity</option></select>
           </div>
           <div className="max-h-[650px] overflow-y-auto">
-            {filtered.length === 0 ? <p className="p-5 text-sm text-slate-400">{incidents.length === 0 ? "No backend incident records are available." : "No incidents match this filter."}</p> :
+            {filtered.length === 0 ? <p className="p-5 text-sm text-slate-400">{incidents.length === 0 ? "No incident records are available." : "No incidents match this filter."}</p> :
               filtered.map((incident) => (
                 <button key={incident.id} type="button" onClick={() => { setSelectedId(incident.id); setShowForm(false); setEditing(false); }}
                   className={cn("w-full border-b border-white/5 p-4 text-left hover:bg-white/[0.04]", selected?.id === incident.id && "bg-cyan-400/[0.07]")}>

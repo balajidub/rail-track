@@ -10,14 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { errorMessage, isBackendConfigured, railTrackApi } from "@/lib/api";
+import { demoStations, demoTrains, getDemoIncidents } from "@/lib/demoData";
 import { matchesQuery } from "@/lib/utils";
 import type { AppView, DelayAlert, Incident, Station, Train, TrainStatus } from "@/types/railway";
 
-type BackendStatus = "loading" | "connected" | "partial" | "unavailable";
 type IncidentFields = Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">;
 type Settled<T> = { data: T; error: null } | { data: null; error: string };
-const backendConfigurationError =
-  "NEXT_PUBLIC_RAILTRACK_API_URL is not configured. Set it at build time to connect the RailTrack backend.";
 
 async function settle<T>(operation: () => Promise<T>): Promise<Settled<T>> {
   try {
@@ -73,17 +71,16 @@ interface RailTrackContextValue {
   addIncident: (incident: IncidentFields) => Promise<string>;
   updateIncident: (id: string, patch: IncidentFields) => Promise<void>;
   advanceIncident: (id: string) => Promise<void>;
-  backendStatus: BackendStatus;
-  backendError: string | null;
   refreshApiData: () => Promise<void>;
+  dataError: string | null;
 }
 
 const RailTrackContext = createContext<RailTrackContextValue | null>(null);
 
 export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<AppView>("dashboard");
-  const [liveTrains, setLiveTrains] = useState<Train[]>([]);
-  const [stationData, setStationData] = useState<Station[]>([]);
+  const [liveTrains, setLiveTrains] = useState<Train[]>(isBackendConfigured ? [] : demoTrains);
+  const [stationData, setStationData] = useState<Station[]>(isBackendConfigured ? [] : demoStations);
   const [selectedTrainId, setSelectedTrainId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TrainStatus>("all");
@@ -92,22 +89,9 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [clock, setClock] = useState("");
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>(
-    isBackendConfigured ? "loading" : "unavailable",
-  );
-  const [backendError, setBackendError] = useState<string | null>(
-    isBackendConfigured ? null : backendConfigurationError,
-  );
-
+  const [incidents, setIncidents] = useState<Incident[]>(isBackendConfigured ? [] : getDemoIncidents());
+  const [dataError, setDataError] = useState<string | null>(null);
   const refreshApiData = useCallback(async () => {
-    if (!isBackendConfigured) {
-      setBackendStatus("unavailable");
-      setBackendError(backendConfigurationError);
-      return;
-    }
-
-    setBackendStatus((status) => status === "connected" || status === "partial" ? status : "loading");
     const [trainResult, stationResult, incidentResult] = await Promise.all([
       settle(railTrackApi.getTrains),
       settle(railTrackApi.getStations),
@@ -128,12 +112,9 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     if (incidentResult.data !== null) {
       setIncidents(incidentResult.data);
     }
-
-    const successes = [trainResult, stationResult, incidentResult].filter((result) => result.data !== null).length;
     const errors = [trainResult, stationResult, incidentResult]
       .flatMap((result) => result.error ? [result.error] : []);
-    setBackendError(errors.length ? errors.join(" ") : null);
-    setBackendStatus(successes === 0 ? "unavailable" : errors.length ? "partial" : "connected");
+    setDataError(errors.length ? errors.join(" ") : null);
   }, []);
 
   useEffect(() => {
@@ -162,7 +143,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!settings.autoRefresh || !isBackendConfigured) return;
+    if (!settings.autoRefresh) return;
     const id = window.setInterval(() => {
       void refreshApiData();
     }, 10_000);
@@ -194,8 +175,8 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
         id: train.id,
         trainId: train.id,
         title: `${train.number} · ${train.name} delay`,
-        message: `The backend record reports a delay of ${train.delayMinutes} minutes.`,
-        time: "Latest backend response",
+        message: `${train.number} is ${train.delayMinutes} minutes behind schedule.`,
+        time: "Recent update",
         severity: train.delayMinutes >= 60 ? "critical" : "warning",
         read: readAlertIds.has(train.id),
       }));
@@ -218,18 +199,12 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addIncident = useCallback(async (incident: IncidentFields) => {
-    if (!isBackendConfigured) {
-      throw new Error(backendConfigurationError);
-    }
     const saved = await railTrackApi.createIncident(incident);
     setIncidents((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
     return saved.id;
   }, []);
 
   const updateIncident = useCallback(async (id: string, patch: IncidentFields) => {
-    if (!isBackendConfigured) {
-      throw new Error(backendConfigurationError);
-    }
     const saved = await railTrackApi.updateIncident(id, patch);
     setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
   }, []);
@@ -237,9 +212,6 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   const advanceIncident = useCallback(async (id: string) => {
     const currentIncident = incidents.find((incident) => incident.id === id);
     if (!currentIncident || currentIncident.status === "Resolved") return;
-    if (!isBackendConfigured) {
-      throw new Error(backendConfigurationError);
-    }
     const workflow = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"] as const;
     const nextStatus = workflow[workflow.indexOf(currentIncident.status) + 1];
     if (!nextStatus) return;
@@ -275,9 +247,8 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     addIncident,
     updateIncident,
     advanceIncident,
-    backendStatus,
-    backendError,
     refreshApiData,
+    dataError,
   };
 
   return <RailTrackContext.Provider value={value}>{children}</RailTrackContext.Provider>;

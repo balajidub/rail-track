@@ -87,9 +87,7 @@ export function StationIntelligenceView() {
       <header>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Station intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Station congestion monitor</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Congestion and passenger values are backend estimates, not measured station counts.
-        </p>
+        <p className="mt-1 text-sm text-slate-400">Station activity and platform utilization across the network.</p>
       </header>
 
       {selected ? (
@@ -113,7 +111,7 @@ export function StationIntelligenceView() {
           <div className="max-h-[650px] overflow-y-auto">
             {filteredStations.length === 0 ? (
               <p className="p-5 text-sm text-slate-400">
-                {stations.length === 0 ? "No backend station records are available." : "No stations match your search."}
+                {stations.length === 0 ? "No stations are available." : "No stations match your search."}
               </p>
             ) : (
               filteredStations.map((station) => (
@@ -160,15 +158,15 @@ export function StationIntelligenceView() {
 
               {busiestPlatform && busiestPlatform.level !== "Low" ? (
                 <div role="note" className={cn("mt-4 rounded-xl border p-3 text-sm", levelStyles[busiestPlatform.level])}>
-                  <p className="font-medium">Backend estimate · Platform {busiestPlatform.platform}</p>
-                  <p className="mt-1 text-xs opacity-80">{busiestPlatform.level} estimate at {busiestPlatform.densityPercent}% density; not an observed passenger count.</p>
+                  <p className="font-medium">Platform {busiestPlatform.platform} · {busiestPlatform.level}</p>
+                  <p className="mt-1 text-xs opacity-80">Estimated utilization: {busiestPlatform.densityPercent}%.</p>
                 </div>
               ) : null}
 
               <div className="mt-5">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-medium text-white">Platform estimates</h3>
-                  <span className="text-[11px] text-slate-500">Values returned by the backend</span>
+                  <span className="text-[11px] text-slate-500">Platform utilization</span>
                 </div>
                 {selectedCongestion?.platforms.length ? (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -177,7 +175,7 @@ export function StationIntelligenceView() {
                         key={platform.platform}
                         type="button"
                         aria-pressed={selectedPlatform?.platform === platform.platform}
-                        title={`Platform ${platform.platform}: backend estimate ${platform.densityPercent}%`}
+                        title={`Platform ${platform.platform}: ${platform.densityPercent}% utilization`}
                         onClick={() => setPlatformId(platform.platform)}
                         className={cn("rounded-xl border p-2 text-center transition hover:brightness-125", heatStyles[platform.level], selectedPlatform?.platform === platform.platform && "ring-2 ring-white/80")}
                       >
@@ -196,7 +194,7 @@ export function StationIntelligenceView() {
                       <span className="text-slate-400">Estimated passengers: {selectedPlatform.estimatedPassengers}</span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Linked backend train records: {selectedPlatform.trainNumbers.length ? selectedPlatform.trainNumbers.join(", ") : "none"}
+                      Connected services: {selectedPlatform.trainNumbers.length ? selectedPlatform.trainNumbers.join(", ") : "none"}
                     </p>
                   </div>
                 ) : null}
@@ -211,7 +209,7 @@ export function StationIntelligenceView() {
             </GlassCard>
 
             <GlassCard>
-              <h3 className="text-sm font-medium text-white">Backend-recorded congestion history</h3>
+              <h3 className="text-sm font-medium text-white">Station activity history</h3>
               {historyResource.status === "api" && apiHistory.length === 0 ? (
                 <p className="mt-3 text-sm text-slate-400">No historical snapshots are recorded for this station.</p>
               ) : apiHistory.length ? (
@@ -222,19 +220,19 @@ export function StationIntelligenceView() {
                       <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                       <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                       <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                      <Line type="monotone" dataKey="activityScore" name="Backend activity estimate" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 3 }} />
+                      <Line type="monotone" dataKey="activityScore" name="Activity estimate" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               ) : null}
               <p className="mt-3 text-[11px] leading-5 text-slate-500">
-                Historical values come from backend congestion snapshots and may be generated estimates.
+                Passenger counts and platform density are estimates.
               </p>
             </GlassCard>
           </div>
         ) : (
           <GlassCard>
-            <p className="text-sm text-slate-400">Select a backend station record to load congestion information.</p>
+            <p className="text-sm text-slate-400">Select a station to view its activity details.</p>
           </GlassCard>
         )}
       </div>

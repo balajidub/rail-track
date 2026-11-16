@@ -12,10 +12,10 @@ export function OverviewCards() {
   const delayed = trains.filter((train) => train.status === "delayed").length;
 
   const cards = [
-    { label: "Active trains", value: active, hint: "Based on backend status", icon: Activity, accent: "from-cyan-400/20 to-blue-600/10" },
-    { label: "On-time trains", value: onTime, hint: "Backend status records", icon: Clock, accent: "from-emerald-400/20 to-cyan-500/10" },
-    { label: "Delayed trains", value: delayed, hint: "Backend status records", icon: TriangleAlert, accent: "from-amber-400/20 to-orange-500/10" },
-    { label: "Stations", value: stations.length, hint: "Backend station records", icon: Landmark, accent: "from-sky-400/20 to-indigo-500/10" },
+    { label: "Active trains", value: active, hint: "Currently in service", icon: Activity, accent: "from-cyan-400/20 to-blue-600/10" },
+    { label: "On-time trains", value: onTime, hint: "Running to schedule", icon: Clock, accent: "from-emerald-400/20 to-cyan-500/10" },
+    { label: "Delayed trains", value: delayed, hint: "Service updates", icon: TriangleAlert, accent: "from-amber-400/20 to-orange-500/10" },
+    { label: "Stations", value: stations.length, hint: "Across the network", icon: Landmark, accent: "from-sky-400/20 to-indigo-500/10" },
   ];
 
   return (

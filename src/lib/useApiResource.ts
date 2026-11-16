@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { errorMessage, isBackendConfigured } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 
-export type ApiResourceStatus = "idle" | "loading" | "api" | "error" | "unavailable";
+export type ApiResourceStatus = "idle" | "loading" | "api" | "error";
 
 type ApiResourceResult<T> =
   | { key: string; version: number; status: "api"; data: T }
@@ -23,7 +23,7 @@ export function useApiResource<T>(
   }, [fetcher]);
 
   useEffect(() => {
-    if (!isBackendConfigured || !enabled) return;
+    if (!enabled) return;
 
     let active = true;
     const version = refreshVersion;
@@ -49,20 +49,18 @@ export function useApiResource<T>(
     result?.key === key && result.version === refreshVersion
       ? result
       : null;
-  const status: ApiResourceStatus = !isBackendConfigured
-    ? "unavailable"
-    : !enabled
-      ? "idle"
-      : !currentResult
-        ? "loading"
-        : currentResult.status;
+  const status: ApiResourceStatus = !enabled
+    ? "idle"
+    : !currentResult
+      ? "loading"
+      : currentResult.status;
 
   return {
-    data: isBackendConfigured && enabled && currentResult?.status === "api"
+    data: enabled && currentResult?.status === "api"
       ? currentResult.data
       : null,
     status,
-    error: isBackendConfigured && enabled && currentResult?.status === "error"
+    error: enabled && currentResult?.status === "error"
       ? currentResult.error
       : null,
     refresh,

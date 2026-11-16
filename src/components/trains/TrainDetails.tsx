@@ -12,7 +12,7 @@ export function TrainDetails() {
     return (
       <p className="p-6 text-sm text-slate-400">
         {trains.length === 0
-          ? "No backend train records are available."
+          ? "No train services are available."
           : "Select a train to inspect route, platform and ETA."}
       </p>
     );
@@ -56,7 +56,7 @@ export function TrainDetails() {
           />
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          {Math.round(selectedTrain.progress * 100)}% backend-reported route progress · {selectedTrain.coaches} coaches
+          {Math.round(selectedTrain.progress * 100)}% route progress · {selectedTrain.coaches} coaches
         </p>
       </div>
 

@@ -46,9 +46,7 @@ export function PredictionsView() {
       <header>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Delay intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Delay risk estimates</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Rule-based estimates from the backend prediction service, not an external live railway or weather feed.
-        </p>
+        <p className="mt-1 text-sm text-slate-400">Delay risk estimates and arrival outlook across the network.</p>
       </header>
       <ApiDataNotice status={predictionResource.status} error={predictionResource.error} />
 
@@ -64,7 +62,7 @@ export function PredictionsView() {
             >
               <span className="text-xs uppercase tracking-wider">{risk} risk</span>
               <span className="mt-2 block text-2xl font-semibold">{count}</span>
-              <span className="text-xs opacity-70">backend estimates</span>
+              <span className="text-xs opacity-70">risk estimates</span>
             </button>
           );
         })}
@@ -94,10 +92,10 @@ export function PredictionsView() {
             {filtered.length === 0 ? (
               <p className="p-5 text-sm text-slate-400">
                 {predictionResource.status === "loading"
-                  ? "Loading backend prediction records…"
+                  ? "Loading delay estimates…"
                   : predictionResource.status === "api"
-                    ? "No backend predictions match the current train records and filters."
-                    : "No backend prediction records are available."}
+                    ? "No predictions match the current trains and filters."
+                    : "No delay estimates are available."}
               </p>
             ) : (
               filtered.map(({ train, prediction }) => (
@@ -128,7 +126,7 @@ export function PredictionsView() {
                 <div>
                   <p className="font-mono text-sm text-cyan-300">{selected.train.number}</p>
                   <h2 className="mt-1 text-xl font-semibold text-white">{selected.train.name}</h2>
-                  <p className="mt-1 text-sm text-slate-400">Current backend status: {selected.train.status.replace("-", " ")}</p>
+                  <p className="mt-1 text-sm text-slate-400">Current status: {selected.train.status.replace("-", " ")}</p>
                 </div>
                 <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", riskStyles[selected.prediction.risk])}>
                   {selected.prediction.risk} · {selected.prediction.riskScore}%
@@ -137,7 +135,7 @@ export function PredictionsView() {
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <Metric label="Estimated delay" value={`${selected.prediction.predictedDelayMinutes} min`} />
                 <Metric label="Estimated arrival" value={selected.prediction.estimatedArrival} />
-                <Metric label="Backend confidence estimate" value={`${selected.prediction.confidence}%`} />
+                <Metric label="Confidence estimate" value={`${selected.prediction.confidence}%`} />
                 <Metric label="Recorded delay" value={`${selected.train.delayMinutes} min`} />
               </div>
             </GlassCard>
@@ -155,7 +153,7 @@ export function PredictionsView() {
           </div>
         ) : (
           <GlassCard>
-            <p className="text-sm text-slate-400">Prediction details appear when a backend prediction is available.</p>
+            <p className="text-sm text-slate-400">Prediction details appear when an estimate is available.</p>
           </GlassCard>
         )}
       </div>

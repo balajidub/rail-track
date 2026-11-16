@@ -11,7 +11,7 @@ export function TrainList({ limit }: { limit?: number }) {
   if (rows.length === 0) {
     return (
       <p className="px-4 py-8 text-center text-sm text-slate-400">
-        {trains.length === 0 ? "No backend train records are available." : "No trains match the current filters."}
+        {trains.length === 0 ? "No train services are available." : "No trains match the current filters."}
       </p>
     );
   }

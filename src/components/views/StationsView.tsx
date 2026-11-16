@@ -25,7 +25,7 @@ export function StationsView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Stations</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Junction directory</h1>
-        <p className="mt-1 text-sm text-slate-400">Station information returned by the configured backend.</p>
+        <p className="mt-1 text-sm text-slate-400">Browse stations, facilities and connecting services.</p>
       </div>
 
       <GlassCard>
@@ -41,7 +41,7 @@ export function StationsView() {
         {rows.length === 0 ? (
           <GlassCard className="md:col-span-2 xl:col-span-3">
             <p className="text-sm text-slate-400">
-              {stations.length === 0 ? "No backend station records are available." : "No stations match your search."}
+              {stations.length === 0 ? "No stations are available." : "No stations match your search."}
             </p>
           </GlassCard>
         ) : null}

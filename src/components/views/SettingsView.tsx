@@ -4,14 +4,14 @@ import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
-import { errorMessage, isBackendConfigured, railTrackApi, type SimulationStatus } from "@/lib/api";
+import { errorMessage, railTrackApi, type SimulationStatus } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
 
 export function SettingsView() {
   const { settings, updateSettings, refreshApiData } = useRailTrack();
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const simulation = useApiResource<SimulationStatus | null>(
+  const serviceStatus = useApiResource<SimulationStatus | null>(
     "simulation-status",
     railTrackApi.getSimulationStatus,
   );
@@ -20,7 +20,7 @@ export function SettingsView() {
     setPendingAction(action);
     setActionError(null);
     try {
-      simulation.setData(await operation());
+      serviceStatus.setData(await operation());
       await refreshApiData();
     } catch (error) {
       setActionError(errorMessage(error));
@@ -63,7 +63,7 @@ export function SettingsView() {
         <GlassCard>
           <h2 className="text-sm font-medium text-white">Board behavior</h2>
           <Toggle
-            label="Auto-refresh backend records"
+            label="Auto-refresh train data"
             checked={settings.autoRefresh}
             onChange={(checked) => updateSettings({ autoRefresh: checked })}
           />
@@ -96,37 +96,31 @@ export function SettingsView() {
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-medium text-white">Backend simulation controls</h2>
+            <h2 className="text-sm font-medium text-white">Network service controls</h2>
             <p className="mt-1 text-xs text-slate-400">
-              Controls backend-generated train data. No railway operator or external live feed is connected.
+              Start, pause or reset network updates.
             </p>
           </div>
-          {simulation.data ? (
-            <span className={`rounded-full border px-2.5 py-1 text-xs ${simulation.data.running
+          {serviceStatus.data ? (
+            <span className={`rounded-full border px-2.5 py-1 text-xs ${serviceStatus.data.running
               ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
               : "border-slate-400/20 bg-slate-400/10 text-slate-300"}`}>
-              {simulation.data.running ? "Running" : "Paused"}
+              {serviceStatus.data.running ? "Running" : "Paused"}
             </span>
           ) : null}
         </div>
-        {!isBackendConfigured ? (
-          <p className="mt-3 text-xs text-slate-400">
-            Set NEXT_PUBLIC_RAILTRACK_API_URL at build time to enable backend simulation controls.
-          </p>
-        ) : (
-          <>
-            <div className="mt-3">
-              <ApiDataNotice status={simulation.status} error={simulation.error} />
-            </div>
-            {simulation.data ? (
-              <p className="mt-3 text-xs text-slate-400">
-                Backend simulation time: {new Date(simulation.data.simulatedAt).toLocaleString()} · mode: {simulation.data.mode}
-              </p>
-            ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3">
+            <ApiDataNotice status={serviceStatus.status} error={serviceStatus.error} />
+          </div>
+          {serviceStatus.data ? (
+            <p className="mt-3 text-xs text-slate-400">
+              Last updated: {new Date(serviceStatus.data.updatedAt).toLocaleString()}
+            </p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={!simulation.data || pendingAction !== null}
+                disabled={!serviceStatus.data || pendingAction !== null}
                 onClick={() => void runAction("start", railTrackApi.startSimulation)}
                 className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -134,7 +128,7 @@ export function SettingsView() {
               </button>
               <button
                 type="button"
-                disabled={!simulation.data || pendingAction !== null}
+                disabled={!serviceStatus.data || pendingAction !== null}
                 onClick={() => void runAction("pause", railTrackApi.pauseSimulation)}
                 className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -142,7 +136,7 @@ export function SettingsView() {
               </button>
               <button
                 type="button"
-                disabled={!simulation.data || pendingAction !== null}
+                disabled={!serviceStatus.data || pendingAction !== null}
                 onClick={() => void runAction("reset", railTrackApi.resetSimulation)}
                 className="rounded-xl border border-amber-400/20 px-3 py-2 text-xs text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -151,15 +145,13 @@ export function SettingsView() {
               <button
                 type="button"
                 disabled={pendingAction !== null}
-                onClick={simulation.refresh}
+                onClick={serviceStatus.refresh}
                 className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Refresh status
               </button>
-            </div>
-            {actionError ? <p role="alert" className="mt-3 text-xs text-rose-300">{actionError}</p> : null}
-          </>
-        )}
+          </div>
+          {actionError ? <p role="alert" className="mt-3 text-xs text-rose-300">{actionError}</p> : null}
       </GlassCard>
 
     </div>
