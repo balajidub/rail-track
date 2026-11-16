@@ -9,14 +9,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { delayAlerts as seedAlerts, seedIncidents, stations as seedStations, trains as seedTrains } from "@/data/mock";
 import { errorMessage, isBackendConfigured, railTrackApi } from "@/lib/api";
-import { currentAndNextStop, matchesQuery } from "@/lib/utils";
+import { matchesQuery } from "@/lib/utils";
 import type { AppView, DelayAlert, Incident, Station, Train, TrainStatus } from "@/types/railway";
 
-type BackendStatus = "mock" | "loading" | "connected" | "partial" | "unavailable";
+type BackendStatus = "loading" | "connected" | "partial" | "unavailable";
 type IncidentFields = Pick<Incident, "title" | "description" | "category" | "severity" | "priority" | "trainId" | "stationId">;
 type Settled<T> = { data: T; error: null } | { data: null; error: string };
+const backendConfigurationError =
+  "NEXT_PUBLIC_RAILTRACK_API_URL is not configured. Set it at build time to connect the RailTrack backend.";
 
 async function settle<T>(operation: () => Promise<T>): Promise<Settled<T>> {
   try {
@@ -24,23 +25,6 @@ async function settle<T>(operation: () => Promise<T>): Promise<Settled<T>> {
   } catch (error) {
     return { data: null, error: errorMessage(error) };
   }
-}
-
-function mergeById<T extends { id: string }>(mock: T[], api: T[]): T[] {
-  const apiById = new Map(api.map((item) => [item.id, item]));
-  const mockIds = new Set(mock.map((item) => item.id));
-  return [
-    ...mock.map((item) => apiById.get(item.id) ?? item),
-    ...api.filter((item) => !mockIds.has(item.id)),
-  ];
-}
-
-function mergeIncidents(existing: Incident[], api: Incident[]): Incident[] {
-  const apiTitles = new Set(api.map((incident) => incident.title.trim().toLowerCase()));
-  return [
-    ...api,
-    ...existing.filter((incident) => !apiTitles.has(incident.title.trim().toLowerCase())),
-  ];
 }
 
 export interface SettingsState {
@@ -53,8 +37,8 @@ export interface SettingsState {
 }
 
 const defaultSettings: SettingsState = {
-  operatorName: "John",
-  controlRoom: "New Delhi Command Center",
+  operatorName: "",
+  controlRoom: "",
   autoRefresh: true,
   compactLists: false,
   delayThreshold: 15,
@@ -98,66 +82,59 @@ const RailTrackContext = createContext<RailTrackContextValue | null>(null);
 
 export function RailTrackProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<AppView>("dashboard");
-  const [liveTrains, setLiveTrains] = useState<Train[]>(seedTrains);
-  const [stationData, setStationData] = useState<Station[]>(seedStations);
-  const [selectedTrainId, setSelectedTrainId] = useState<string | null>(seedTrains[0]?.id ?? null);
+  const [liveTrains, setLiveTrains] = useState<Train[]>([]);
+  const [stationData, setStationData] = useState<Station[]>([]);
+  const [selectedTrainId, setSelectedTrainId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TrainStatus>("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [alerts, setAlerts] = useState<DelayAlert[]>(seedAlerts);
+  const [readAlertIds, setReadAlertIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
-  const [clock, setClock] = useState("18:42:11");
-  const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
-  const [backendConnected, setBackendConnected] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>(isBackendConfigured ? "loading" : "mock");
-  const [backendError, setBackendError] = useState<string | null>(null);
+  const [clock, setClock] = useState("");
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>(
+    isBackendConfigured ? "loading" : "unavailable",
+  );
+  const [backendError, setBackendError] = useState<string | null>(
+    isBackendConfigured ? null : backendConfigurationError,
+  );
 
   const refreshApiData = useCallback(async () => {
     if (!isBackendConfigured) {
-      setBackendStatus("mock");
-      setBackendError(null);
-      setBackendConnected(false);
+      setBackendStatus("unavailable");
+      setBackendError(backendConfigurationError);
       return;
     }
 
-    setBackendStatus("loading");
+    setBackendStatus((status) => status === "connected" || status === "partial" ? status : "loading");
     const [trainResult, stationResult, incidentResult] = await Promise.all([
       settle(railTrackApi.getTrains),
       settle(railTrackApi.getStations),
       settle(railTrackApi.getIncidents),
     ]);
 
-    if (trainResult.data) {
-      setLiveTrains((current) => mergeById(current, trainResult.data));
+    if (trainResult.data !== null) {
+      setLiveTrains(trainResult.data);
+      setSelectedTrainId((current) =>
+        current && trainResult.data.some((train) => train.id === current)
+          ? current
+          : trainResult.data[0]?.id ?? null,
+      );
     }
-    if (stationResult.data) {
-      setStationData((current) => mergeById(current, stationResult.data));
+    if (stationResult.data !== null) {
+      setStationData(stationResult.data);
     }
-    if (incidentResult.data) {
-      setIncidents((current) => mergeIncidents(current, incidentResult.data));
+    if (incidentResult.data !== null) {
+      setIncidents(incidentResult.data);
     }
 
     const successes = [trainResult, stationResult, incidentResult].filter((result) => result.data !== null).length;
     const errors = [trainResult, stationResult, incidentResult]
       .flatMap((result) => result.error ? [result.error] : []);
-    setBackendConnected(trainResult.data !== null);
     setBackendError(errors.length ? errors.join(" ") : null);
     setBackendStatus(successes === 0 ? "unavailable" : errors.length ? "partial" : "connected");
   }, []);
-
-  const refreshTrainsFromApi = useCallback(async () => {
-    const result = await settle(railTrackApi.getTrains);
-    if (result.error !== null) {
-      setBackendConnected(false);
-      setBackendStatus("unavailable");
-      setBackendError(result.error);
-      return;
-    }
-    setLiveTrains((current) => mergeById(current, result.data));
-    setBackendConnected(true);
-    setBackendStatus((status) => status === "partial" || backendError ? "partial" : "connected");
-  }, [backendError]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -171,6 +148,7 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
       const now = new Date();
       setClock(
         now.toLocaleTimeString("en-IN", {
+          timeZone: "Asia/Kolkata",
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
@@ -184,63 +162,15 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!settings.autoRefresh || backendConnected) return;
-
+    if (!settings.autoRefresh || !isBackendConfigured) return;
     const id = window.setInterval(() => {
-      setLiveTrains((current) =>
-        current.map((train) => {
-          if (train.status === "cancelled" || train.status === "arrived") return train;
-
-          const increment = 0.008 + train.speed / 18000;
-          const progress = Math.min(1, train.progress + increment);
-          const status: TrainStatus =
-            progress >= 0.99 ? "arrived" : train.delayMinutes >= 15 ? "delayed" : "on-time";
-          const speed =
-            status === "arrived"
-              ? 0
-              : Math.max(42, Math.min(140, train.speed + ((progress * 10) % 5) - 2));
-          const { current: currentStop, next } = currentAndNextStop({ ...train, progress });
-
-          return {
-            ...train,
-            progress,
-            status,
-            speed: Math.round(speed),
-            currentStationId: currentStop.stationId,
-            nextStationId: next.stationId,
-            delayMinutes:
-              train.status === "delayed"
-                ? train.delayMinutes + (progress > 0.9 ? 0 : 0)
-                : train.delayMinutes,
-          };
-        }),
-      );
-    }, 2800);
-
-    return () => window.clearInterval(id);
-  }, [backendConnected, settings.autoRefresh]);
-
-  useEffect(() => {
-    if (!settings.autoRefresh || !backendConnected) return;
-    const id = window.setInterval(() => {
-      void refreshTrainsFromApi();
+      void refreshApiData();
     }, 10_000);
     return () => window.clearInterval(id);
-  }, [backendConnected, refreshTrainsFromApi, settings.autoRefresh]);
+  }, [refreshApiData, settings.autoRefresh]);
 
   const stations = stationData;
-
-  const trains = useMemo(
-    () =>
-      liveTrains.map((train) => {
-        if (train.status === "cancelled" || train.status === "arrived") return train;
-        return {
-          ...train,
-          status: (train.delayMinutes >= settings.delayThreshold ? "delayed" : "on-time") as TrainStatus,
-        };
-      }),
-    [liveTrains, settings.delayThreshold],
-  );
+  const trains = liveTrains;
 
   const filteredTrains = useMemo(() => {
     return trains.filter((train) => {
@@ -256,6 +186,21 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
     [trains, selectedTrainId],
   );
 
+  const alerts = useMemo<DelayAlert[]>(() => {
+    if (!settings.pushAlerts) return [];
+    return trains
+      .filter((train) => train.delayMinutes >= settings.delayThreshold && train.delayMinutes > 0)
+      .map((train) => ({
+        id: train.id,
+        trainId: train.id,
+        title: `${train.number} · ${train.name} delay`,
+        message: `The backend record reports a delay of ${train.delayMinutes} minutes.`,
+        time: "Latest backend response",
+        severity: train.delayMinutes >= 60 ? "critical" : "warning",
+        read: readAlertIds.has(train.id),
+      }));
+  }, [readAlertIds, settings.delayThreshold, settings.pushAlerts, trains]);
+
   const unreadCount = alerts.filter((alert) => !alert.read).length;
 
   const selectTrain = useCallback((id: string | null) => {
@@ -263,88 +208,43 @@ export function RailTrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markAlertRead = useCallback((id: string) => {
-    setAlerts((current) =>
-      current.map((alert) => (alert.id === id ? { ...alert, read: true } : alert)),
-    );
+    setReadAlertIds((current) => new Set(current).add(id));
   }, []);
 
-  const markAllRead = useCallback(() => {
-    setAlerts((current) => current.map((alert) => ({ ...alert, read: true })));
-  }, []);
+  const markAllRead = useCallback(() => setReadAlertIds(new Set(alerts.map((alert) => alert.id))), [alerts]);
 
   const updateSettings = useCallback((patch: Partial<SettingsState>) => {
     setSettings((current) => ({ ...current, ...patch }));
   }, []);
 
   const addIncident = useCallback(async (incident: IncidentFields) => {
-    if (isBackendConfigured) {
-      const saved = await railTrackApi.createIncident(incident);
-      setIncidents((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      return saved.id;
+    if (!isBackendConfigured) {
+      throw new Error(backendConfigurationError);
     }
-    const now = new Date().toISOString();
-    const id = `INC-${Date.now()}`;
-    setIncidents((current) => [
-      {
-        ...incident,
-        id,
-        status: "Reported",
-        createdAt: now,
-        updatedAt: now,
-        history: [{ timestamp: now, note: "Incident reported to the control room.", status: "Reported" }],
-      },
-      ...current,
-    ]);
-    return id;
+    const saved = await railTrackApi.createIncident(incident);
+    setIncidents((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+    return saved.id;
   }, []);
 
   const updateIncident = useCallback(async (id: string, patch: IncidentFields) => {
-    if (isBackendConfigured) {
-      const saved = await railTrackApi.updateIncident(id, patch);
-      setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
-      return;
+    if (!isBackendConfigured) {
+      throw new Error(backendConfigurationError);
     }
-    const now = new Date().toISOString();
-    setIncidents((current) =>
-      current.map((incident) => incident.id === id && incident.status !== "Resolved"
-        ? {
-            ...incident,
-            ...patch,
-            updatedAt: now,
-            history: [...incident.history, {
-              timestamp: now,
-              note: "Incident details updated.",
-              status: incident.status,
-            }],
-          }
-        : incident),
-    );
+    const saved = await railTrackApi.updateIncident(id, patch);
+    setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
   }, []);
 
   const advanceIncident = useCallback(async (id: string) => {
-    const workflow = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"] as const;
     const currentIncident = incidents.find((incident) => incident.id === id);
     if (!currentIncident || currentIncident.status === "Resolved") return;
+    if (!isBackendConfigured) {
+      throw new Error(backendConfigurationError);
+    }
+    const workflow = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"] as const;
     const nextStatus = workflow[workflow.indexOf(currentIncident.status) + 1];
     if (!nextStatus) return;
-    if (isBackendConfigured) {
-      const saved = await railTrackApi.advanceIncident(id, nextStatus);
-      setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
-      return;
-    }
-    const now = new Date().toISOString();
-    setIncidents((current) =>
-      current.map((incident) => {
-        if (incident.id !== id || incident.status === "Resolved") return incident;
-        const status = workflow[Math.min(workflow.indexOf(incident.status) + 1, workflow.length - 1)];
-        return {
-          ...incident,
-          status,
-          updatedAt: now,
-          history: [...incident.history, { timestamp: now, note: `Status advanced to ${status}.`, status }],
-        };
-      }),
-    );
+    const saved = await railTrackApi.advanceIncident(id, nextStatus);
+    setIncidents((current) => current.map((incident) => incident.id === id ? saved : incident));
   }, [incidents]);
 
   const value: RailTrackContextValue = {

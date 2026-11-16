@@ -1,0 +1,43 @@
+INSERT INTO trains (
+    id, train_number, name, type, origin_station_id, destination_station_id,
+    scheduled_departure, scheduled_arrival, duration_minutes, status, delay_minutes,
+    speed_kph, current_station_id, next_station_id, progress, platform_number,
+    coach_count, occupancy_percent, distance_km, service_days
+) VALUES
+('t-demo-1001', 'DEMO-1001', 'Demo Northern Connector', 'EXPRESS', 'NDLS', 'AGC',
+ '06:00:00', '08:30:00', 150, 'ON_TIME', 0, 0, 'NDLS', 'AGC', 0.0000, '3', 12, 0, 195, 'Daily'),
+('t-demo-1002', 'DEMO-1002', 'Demo Central Express', 'SUPERFAST', 'NDLS', 'KOTA',
+ '07:15:00', '14:45:00', 450, 'DELAYED', 15, 0, 'AGC', 'KOTA', 0.4200, '2', 16, 0, 465, 'Daily'),
+('t-demo-1003', 'DEMO-1003', 'Demo Bhopal Intercity', 'EXPRESS', 'AGC', 'BPL',
+ '08:10:00', '14:35:00', 385, 'ON_TIME', 0, 0, 'KOTA', 'BPL', 0.5000, '1', 14, 0, 581, 'Daily'),
+('t-demo-1004', 'DEMO-1004', 'Demo Western Express', 'EXPRESS', 'KOTA', 'MMCT',
+ '09:00:00', '22:30:00', 810, 'DELAYED', 25, 0, 'BPL', 'MMCT', 0.6100, '4', 18, 0, 919, 'Daily'),
+('t-demo-1005', 'DEMO-1005', 'Demo Deccan Link', 'SUPERFAST', 'BPL', 'NGP',
+ '10:20:00', '16:00:00', 340, 'ON_TIME', 0, 0, 'BPL', 'NGP', 0.0000, '3', 16, 0, 385, 'Daily'),
+('t-demo-1006', 'DEMO-1006', 'Demo Southern Connector', 'EXPRESS', 'NGP', 'MAS',
+ '11:30:00', '02:30:00', 900, 'ON_TIME', 0, 0, 'NGP', 'MAS', 0.0000, '5', 20, 0, 1083, 'Daily'),
+('t-demo-1007', 'DEMO-1007', 'Demo Kanpur Link', 'MAIL', 'NDLS', 'CNB',
+ '12:00:00', '17:55:00', 355, 'DELAYED', 10, 0, 'NDLS', 'CNB', 0.0000, '6', 12, 0, 440, 'Daily'),
+('t-demo-1008', 'DEMO-1008', 'Demo Agra Shuttle', 'EXPRESS', 'AGC', 'NDLS',
+ '13:15:00', '15:45:00', 150, 'ON_TIME', 0, 0, 'AGC', 'NDLS', 0.0000, '2', 10, 0, 195, 'Daily');
+
+INSERT INTO train_stops (train_id, sequence_number, station_id, arrival_time, departure_time, platform_number, distance_km, halt_minutes) VALUES
+('t-demo-1001', 0, 'NDLS', NULL, '06:00:00', '3', 0, 0),
+('t-demo-1001', 1, 'AGC', '08:30:00', NULL, '2', 195, 0),
+('t-demo-1002', 0, 'NDLS', NULL, '07:15:00', '3', 0, 0),
+('t-demo-1002', 1, 'AGC', '09:45:00', '09:50:00', '2', 195, 5),
+('t-demo-1002', 2, 'KOTA', '14:45:00', NULL, '1', 465, 0),
+('t-demo-1003', 0, 'AGC', NULL, '08:10:00', '2', 0, 0),
+('t-demo-1003', 1, 'KOTA', '11:00:00', '11:05:00', '1', 270, 5),
+('t-demo-1003', 2, 'BPL', '14:35:00', NULL, '4', 581, 0),
+('t-demo-1004', 0, 'KOTA', NULL, '09:00:00', '1', 0, 0),
+('t-demo-1004', 1, 'BPL', '13:35:00', '13:40:00', '4', 311, 5),
+('t-demo-1004', 2, 'MMCT', '22:30:00', NULL, '2', 919, 0),
+('t-demo-1005', 0, 'BPL', NULL, '10:20:00', '4', 0, 0),
+('t-demo-1005', 1, 'NGP', '16:00:00', NULL, '5', 385, 0),
+('t-demo-1006', 0, 'NGP', NULL, '11:30:00', '5', 0, 0),
+('t-demo-1006', 1, 'MAS', '02:30:00', NULL, '5', 1083, 0),
+('t-demo-1007', 0, 'NDLS', NULL, '12:00:00', '6', 0, 0),
+('t-demo-1007', 1, 'CNB', '17:55:00', NULL, '6', 440, 0),
+('t-demo-1008', 0, 'AGC', NULL, '13:15:00', '2', 0, 0),
+('t-demo-1008', 1, 'NDLS', '15:45:00', NULL, '3', 195, 0);

@@ -4,11 +4,10 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { ApiDataNotice } from "@/components/api/ApiDataNotice";
 import { useRailTrack } from "@/context/RailTrackContext";
 import { railTrackApi } from "@/lib/api";
-import { coachOccupancies } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
 import type { CoachOccupancy, CoachOccupancyLevel } from "@/types/railway";
 import { useApiResource } from "@/lib/useApiResource";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -37,7 +36,6 @@ export function CoachIntelligenceView() {
   const [sortDescending, setSortDescending] = useState(true);
 
   const train = trains.find((item) => item.id === trainId) ?? trains[0];
-  const localOccupancy = useMemo(() => train ? coachOccupancies(train) : [], [train]);
   const fetchOccupancy = useCallback(
     () => railTrackApi.getTrainCoaches(train?.id ?? ""),
     [train?.id],
@@ -45,34 +43,48 @@ export function CoachIntelligenceView() {
   const occupancyResource = useApiResource(
     `train-coaches:${train?.id ?? "none"}`,
     fetchOccupancy,
-    localOccupancy,
     Boolean(train),
   );
-  const occupancy = occupancyResource.status === "api" && occupancyResource.data.length > 0
-    ? occupancyResource.data
-    : localOccupancy;
+  const occupancy = occupancyResource.data ?? [];
   const filtered = occupancy.filter((coach) => levelFilter === "All" || coach.level === levelFilter)
     .sort((a, b) => sortDescending ? b.occupancyPercent - a.occupancyPercent : a.occupancyPercent - b.occupancyPercent);
   const selectedCoach = filtered.find((coach) => coach.coach === coachId) ?? occupancy.find((coach) => coach.coach === coachId) ?? filtered[0];
   const comparisonTrain = trains.find((item) => item.id === compareId && item.id !== train?.id)
     ?? trains.find((item) => item.id !== train?.id);
-  const comparison = comparisonTrain ? coachOccupancies(comparisonTrain) : [];
-  const average = occupancy.length ? Math.round(occupancy.reduce((sum, coach) => sum + coach.occupancyPercent, 0) / occupancy.length) : 0;
+  const fetchComparison = useCallback(
+    () => railTrackApi.getTrainCoaches(comparisonTrain?.id ?? ""),
+    [comparisonTrain?.id],
+  );
+  const comparisonResource = useApiResource(
+    `train-coaches:${comparisonTrain?.id ?? "none"}`,
+    fetchComparison,
+    Boolean(comparisonTrain),
+  );
+  const comparison = comparisonResource.data ?? [];
+  const average = occupancy.length
+    ? Math.round(occupancy.reduce((sum, coach) => sum + coach.occupancyPercent, 0) / occupancy.length)
+    : null;
+  const comparisonAverage = comparison.length
+    ? Math.round(comparison.reduce((sum, coach) => sum + coach.occupancyPercent, 0) / comparison.length)
+    : null;
   const crowded = occupancy.filter((coach) => coach.level === "Overcrowded").length;
   const chartData = occupancy.slice(0, 12);
 
-  if (!train) return <GlassCard><p className="text-sm text-slate-400">No simulated train data is available.</p></GlassCard>;
+  if (!train) return <GlassCard><p className="text-sm text-slate-400">No backend train records are available.</p></GlassCard>;
 
   return (
     <div className="space-y-5">
       <header>
-        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">V2 · coach intelligence</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Coach intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Coach occupancy monitor</h1>
-        <p className="mt-1 text-sm text-slate-400">Coach-level percentages are fictional simulation estimates, not booking or passenger records.</p>
+        <p className="mt-1 text-sm text-slate-400">Backend occupancy estimates may be simulation-derived; no ticketing or passenger feed is connected.</p>
       </header>
       <ApiDataNotice status={occupancyResource.status} error={occupancyResource.error} />
-      {occupancyResource.status === "api" && occupancyResource.data.length === 0 ? (
-        <p role="status" className="text-xs text-slate-500">No backend coach records are seeded for this train; bundled demo estimates are shown.</p>
+      {comparisonTrain ? (
+        <ApiDataNotice status={comparisonResource.status} error={comparisonResource.error} />
+      ) : null}
+      {occupancyResource.status === "api" && occupancy.length === 0 ? (
+        <p role="status" className="text-xs text-slate-500">No coach occupancy records were returned for this train.</p>
       ) : null}
 
       <GlassCard className="grid gap-3 md:grid-cols-2">
@@ -89,16 +101,16 @@ export function CoachIntelligenceView() {
       </GlassCard>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Summary label="Average coach estimate" value={`${average}%`} />
-        <Summary label="Overcrowded coaches" value={`${crowded} / ${occupancy.length}`} />
-        <Summary label="Train-level simulated occupancy" value={`${train.occupancy}%`} />
+        <Summary label="Average backend coach estimate" value={average === null ? "—" : `${average}%`} />
+        <Summary label="Overcrowded coaches" value={occupancy.length ? `${crowded} / ${occupancy.length}` : "—"} />
+        <Summary label="Train-level backend record" value={`${train.occupancy}%`} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-5">
           <GlassCard>
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div><h2 className="text-base font-medium text-white">Interactive coach formation</h2><p className="mt-1 text-xs text-slate-400">{train.number} · {train.coaches} simulated coaches · select a coach for details</p></div>
+              <div><h2 className="text-base font-medium text-white">Coach occupancy</h2><p className="mt-1 text-xs text-slate-400">{train.number} · {train.coaches} coaches listed · select a returned coach for details</p></div>
               <div className="flex gap-2">
                 <label className="sr-only" htmlFor="coach-filter">Filter coaches</label>
                 <select id="coach-filter" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value as "All" | CoachOccupancyLevel)} className="select-field h-10 w-auto">
@@ -112,23 +124,26 @@ export function CoachIntelligenceView() {
                 <CoachButton key={coach.coach} coach={coach} selected={selectedCoach?.coach === coach.coach} onClick={() => setCoachId(coach.coach)} />
               ))}
             </div>
+            {occupancy.length === 0 ? <p className="mt-4 text-sm text-slate-400">No coach-level occupancy response is available.</p> : null}
             {filtered.length === 0 ? <p className="mt-4 text-sm text-slate-400">No coaches match this occupancy filter.</p> : null}
             <div className="mt-4 flex flex-wrap gap-3">{coachLevels.map((level) => <span key={level} className={cn("rounded-full border px-2 py-1 text-[10px]", levelStyles[level])}>{level}</span>)}</div>
           </GlassCard>
 
           <GlassCard>
             <h2 className="text-sm font-medium text-white">Coach occupancy profile</h2>
-            <div className="mt-4 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
-                  <XAxis dataKey="coach" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                  <Bar dataKey="occupancyPercent" name="Estimated occupancy %" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {chartData.length ? (
+              <div className="mt-4 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                    <XAxis dataKey="coach" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
+                    <Bar dataKey="occupancyPercent" name="Backend estimate %" fill="#22d3ee" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : <p className="mt-4 text-sm text-slate-400">No backend coach occupancy records are available to chart.</p>}
             {occupancy.length > 12 ? <p className="mt-2 text-[10px] text-slate-500">Chart shows the first 12 coaches; all coaches remain selectable above.</p> : null}
           </GlassCard>
         </div>
@@ -140,16 +155,16 @@ export function CoachIntelligenceView() {
           </GlassCard>
           <GlassCard>
             <h2 className="text-sm font-medium text-white">Train comparison</h2>
-            {comparisonTrain ? (
+            {comparisonTrain && average !== null && comparisonAverage !== null ? (
               <>
                 <p className="mt-1 text-xs text-slate-400">{train.number} vs {comparisonTrain.number}</p>
                 <div className="mt-4 space-y-4">
                   <CompareBar label={train.name} value={average} color="bg-cyan-400" />
-                  <CompareBar label={comparisonTrain.name} value={Math.round(comparison.reduce((sum, coach) => sum + coach.occupancyPercent, 0) / comparison.length)} color="bg-blue-400" />
+                  <CompareBar label={comparisonTrain.name} value={comparisonAverage} color="bg-blue-400" />
                 </div>
-                <p className="mt-4 text-xs leading-5 text-slate-500">Side-by-side mock estimates only. No ticketing or reservation data is used.</p>
+                <p className="mt-4 text-xs leading-5 text-slate-500">Both values are backend estimates, not ticketing or reservation records.</p>
               </>
-            ) : <p className="mt-3 text-sm text-slate-400">Add another train to compare estimates.</p>}
+            ) : <p className="mt-3 text-sm text-slate-400">{comparisonTrain ? "Backend occupancy records are unavailable for one or both trains." : "No second backend train record is available to compare."}</p>}
           </GlassCard>
         </div>
       </div>
@@ -168,7 +183,7 @@ function CoachDetail({ coach, trainName }: { coach: CoachOccupancy; trainName: s
     <div className="flex items-start justify-between"><div><p className="font-mono text-cyan-300">{coach.coach}</p><p className="mt-1 text-sm text-slate-400">{trainName}</p></div><span className={cn("rounded-full border px-2 py-1 text-[10px]", levelStyles[coach.level])}>{coach.level}</span></div>
     <p className="mt-5 text-4xl font-semibold text-white">{coach.occupancyPercent}<span className="text-lg text-slate-500">%</span></p>
     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className={cn("h-full rounded-full", coach.level === "Overcrowded" ? "bg-rose-400" : coach.level === "High" ? "bg-amber-400" : coach.level === "Moderate" ? "bg-sky-400" : "bg-emerald-400")} style={{ width: `${coach.occupancyPercent}%` }} /></div>
-    <p className="mt-4 text-xs leading-5 text-slate-400">Illustrative coach loading estimate generated from the train-level mock occupancy. Not actual passenger counts.</p>
+    <p className="mt-4 text-xs leading-5 text-slate-400">Backend occupancy estimate; it is not an observed passenger count.</p>
   </div>;
 }
 

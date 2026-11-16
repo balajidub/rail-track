@@ -1,17 +1,14 @@
 "use client";
 
-import { GlassCard } from "@/components/ui/GlassCard";
 import { ApiDataNotice } from "@/components/api/ApiDataNotice";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useRailTrack } from "@/context/RailTrackContext";
 import { railTrackApi } from "@/lib/api";
-import { stationCongestion } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
-import type { CongestionLevel, StationCongestion as StationCongestionData } from "@/types/railway";
+import type { CongestionLevel, PlatformCongestion, StationCongestion } from "@/types/railway";
 import { useApiResource } from "@/lib/useApiResource";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -22,7 +19,6 @@ import {
 } from "recharts";
 
 const congestionLevels: CongestionLevel[] = ["Low", "Moderate", "High", "Critical"];
-const levels: Array<"All" | CongestionLevel> = ["All", ...congestionLevels];
 const levelStyles: Record<CongestionLevel, string> = {
   Low: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
   Moderate: "border-amber-400/20 bg-amber-400/10 text-amber-300",
@@ -37,115 +33,102 @@ const heatStyles: Record<CongestionLevel, string> = {
 };
 
 export function StationIntelligenceView() {
-  const { stations, trains } = useRailTrack();
+  const { stations } = useRailTrack();
   const [query, setQuery] = useState("");
-  const [levelFilter, setLevelFilter] = useState<"All" | CongestionLevel>("All");
   const [stationId, setStationId] = useState<string | null>(null);
   const [platformId, setPlatformId] = useState<number | null>(null);
 
-  const rows = useMemo(
-    () => stations.map((station) => ({ station, congestion: stationCongestion(station, trains) }))
-      .sort((a, b) => b.congestion.estimatedPassengers - a.congestion.estimatedPassengers),
-    [stations, trains],
+  const filteredStations = stations.filter((station) =>
+    `${station.name} ${station.code} ${station.city} ${station.zone}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
   );
-  const filtered = rows.filter(({ station, congestion }) =>
-    (levelFilter === "All" || congestion.level === levelFilter) &&
-    `${station.name} ${station.code} ${station.city} ${station.zone}`.toLowerCase().includes(query.trim().toLowerCase()),
-  );
-  const selected = filtered.find(({ station }) => station.id === stationId) ?? filtered[0] ?? rows[0];
-  const selectedStationId = selected?.station.id ?? "";
-  const fetchCongestion = () => railTrackApi.getStationCongestion(selectedStationId);
-  const fallbackCongestion = selected?.congestion ?? null;
+  const selected = filteredStations.find((station) => station.id === stationId) ?? filteredStations[0];
+  const selectedStationId = selected?.id ?? "";
   const congestionResource = useApiResource(
-    `station-congestion:${selectedStationId}`,
-    fetchCongestion,
-    fallbackCongestion,
-    Boolean(selectedStationId),
+    `station-congestion:${selectedStationId || "none"}`,
+    () => railTrackApi.getStationCongestion(selectedStationId),
+    Boolean(selected),
   );
-  const selectedCongestion =
-    congestionResource.status === "api" && congestionResource.data?.stationId === selectedStationId
-      ? congestionResource.data
-      : selected?.congestion;
-  const fetchHistory = () => railTrackApi.getStationCongestionHistory(selectedStationId, 12);
-  const fallbackHistory = selected ? [selected.congestion] : [];
+  const selectedCongestion = congestionResource.data?.stationId === selectedStationId
+    ? congestionResource.data
+    : null;
   const historyResource = useApiResource(
-    `station-congestion-history:${selectedStationId}`,
-    fetchHistory,
-    fallbackHistory,
-    Boolean(selectedStationId),
+    `station-congestion-history:${selectedStationId || "none"}`,
+    () => railTrackApi.getStationCongestionHistory(selectedStationId, 12),
+    Boolean(selected),
   );
-  const selectedPlatform = selectedCongestion?.platforms.find((platform) => platform.platform === platformId)
-    ?? selectedCongestion?.platforms[0];
-  const busiestPlatform = selectedCongestion?.platforms.reduce(
-    (busiest, platform) => platform.densityPercent > busiest.densityPercent ? platform : busiest,
-  );
-  const stationHistory = selected?.congestion.platforms.slice(0, 8).map((platform, index) => ({
-    platform: `PF ${platform.platform}`,
-    morning: Math.max(10, platform.densityPercent - (index * 7 + 11) % 28),
-    afternoon: Math.max(12, platform.densityPercent - (index * 5 + 6) % 18),
-    current: platform.densityPercent,
-  })) ?? [];
-  const apiHistory = historyResource.data
-    .filter((snapshot): snapshot is StationCongestionData & { recordedAt: string } => Boolean(snapshot.recordedAt))
+  const history = historyResource.data ?? [];
+  const apiHistory = history
+    .filter((snapshot): snapshot is StationCongestion & { recordedAt: string } => Boolean(snapshot.recordedAt))
     .slice(0, 8)
     .reverse()
-    .map((snapshot) => ({
-      time: new Date(snapshot.recordedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-      activityScore: snapshot.activityScore ?? snapshot.platforms.reduce(
-        (total, platform) => total + platform.densityPercent,
-        0,
-      ) / Math.max(snapshot.platforms.length, 1),
-    }));
-
-  const levelCounts = congestionLevels.map((level) => ({
-    level,
-    count: rows.filter(({ congestion }) => congestion.level === level).length,
-  }));
+    .flatMap((snapshot) => {
+      const activityScore = snapshot.activityScore
+        ?? (snapshot.platforms.length
+          ? snapshot.platforms.reduce((total, platform) => total + platform.densityPercent, 0) / snapshot.platforms.length
+          : null);
+      return activityScore === null
+        ? []
+        : [{
+            time: new Date(snapshot.recordedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+            activityScore,
+          }];
+    });
+  const selectedPlatform = selectedCongestion?.platforms.find((platform) => platform.platform === platformId)
+    ?? selectedCongestion?.platforms[0];
+  const busiestPlatform = selectedCongestion?.platforms.reduce<PlatformCongestion | null>(
+    (busiest, platform) => !busiest || platform.densityPercent > busiest.densityPercent ? platform : busiest,
+    null,
+  ) ?? null;
 
   return (
     <div className="space-y-5">
       <header>
-        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">V2 · station intelligence</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Station intelligence</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Station congestion monitor</h1>
-        <p className="mt-1 text-sm text-slate-400">Passenger counts and platform density are deterministic simulation estimates, not actual station measurements.</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Congestion and passenger values are backend estimates, not measured station counts.
+        </p>
       </header>
-      <div className="space-y-2">
-        <ApiDataNotice status={congestionResource.status} error={congestionResource.error} />
-        <ApiDataNotice status={historyResource.status} error={historyResource.error} />
-      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {levelCounts.map(({ level, count }) => (
-          <button key={level} type="button" onClick={() => setLevelFilter(levelFilter === level ? "All" : level)}
-            className={cn("rounded-2xl border p-4 text-left", levelStyles[level], levelFilter === level && "ring-2 ring-cyan-300/50")}>
-            <span className="text-xs uppercase tracking-wider">{level}</span>
-            <span className="mt-2 block text-2xl font-semibold">{count}</span>
-            <span className="text-xs opacity-70">simulated stations</span>
-          </button>
-        ))}
-      </div>
+      {selected ? (
+        <div className="space-y-2">
+          <ApiDataNotice status={congestionResource.status} error={congestionResource.error} />
+          <ApiDataNotice status={historyResource.status} error={historyResource.error} />
+        </div>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
         <GlassCard padding={false} className="overflow-hidden">
-          <div className="space-y-3 border-b border-white/5 p-4">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} className="select-field" placeholder="Search station, city, code or zone" aria-label="Search stations" />
-            <label className="sr-only" htmlFor="congestion-filter">Filter by congestion</label>
-            <select id="congestion-filter" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value as "All" | CongestionLevel)} className="select-field">
-              {levels.map((level) => <option key={level} value={level}>{level === "All" ? "All congestion levels" : level}</option>)}
-            </select>
+          <div className="border-b border-white/5 p-4">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="select-field"
+              placeholder="Search station, city, code or zone"
+              aria-label="Search stations"
+            />
           </div>
           <div className="max-h-[650px] overflow-y-auto">
-            {filtered.length === 0 ? <p className="p-5 text-sm text-slate-400">No stations match your search.</p> :
-              filtered.map(({ station, congestion }) => (
-                <button key={station.id} type="button" onClick={() => setStationId(station.id)}
-                  className={cn("w-full border-b border-white/5 p-4 text-left hover:bg-white/[0.04]", selected?.station.id === station.id && "bg-cyan-400/[0.07]")}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div><p className="font-mono text-xs text-cyan-300">{station.code} · {station.zone}</p><p className="mt-1 text-sm font-medium text-white">{station.name}</p><p className="text-xs text-slate-500">{station.city}</p></div>
-                    <span className={cn("rounded-full border px-2 py-1 text-[10px]", levelStyles[congestion.level])}>{congestion.level}</span>
-                  </div>
-                  <div className="mt-3 flex justify-between text-xs text-slate-400"><span>~{congestion.estimatedPassengers.toLocaleString()} passengers</span><span>{congestion.incomingTrains} inbound · {congestion.outgoingTrains} outbound</span></div>
+            {filteredStations.length === 0 ? (
+              <p className="p-5 text-sm text-slate-400">
+                {stations.length === 0 ? "No backend station records are available." : "No stations match your search."}
+              </p>
+            ) : (
+              filteredStations.map((station) => (
+                <button
+                  key={station.id}
+                  type="button"
+                  onClick={() => { setStationId(station.id); setPlatformId(null); }}
+                  className={cn("w-full border-b border-white/5 p-4 text-left hover:bg-white/[0.04]", selected?.id === station.id && "bg-cyan-400/[0.07]")}
+                >
+                  <p className="font-mono text-xs text-cyan-300">{station.code} · {station.zone}</p>
+                  <p className="mt-1 text-sm font-medium text-white">{station.name}</p>
+                  <p className="text-xs text-slate-500">{station.city} · {station.platforms} platforms</p>
                 </button>
-              ))}
+              ))
+            )}
           </div>
         </GlassCard>
 
@@ -153,82 +136,117 @@ export function StationIntelligenceView() {
           <div className="space-y-5">
             <GlassCard>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><p className="font-mono text-xs text-cyan-300">{selected.station.code} · {selected.station.zone}</p><h2 className="mt-1 text-xl font-semibold text-white">{selected.station.name}</h2><p className="text-sm text-slate-400">{selected.station.city}, {selected.station.state} · {selected.station.platforms} platforms</p></div>
-                  <span className={cn("rounded-full border px-3 py-1.5 text-xs", levelStyles[selectedCongestion?.level ?? selected.congestion.level])}>{selectedCongestion?.level ?? selected.congestion.level} estimate</span>
+                <div>
+                  <p className="font-mono text-xs text-cyan-300">{selected.code} · {selected.zone}</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">{selected.name}</h2>
+                  <p className="text-sm text-slate-400">{selected.city}, {selected.state} · {selected.platforms} platforms</p>
+                </div>
+                {selectedCongestion ? (
+                  <span className={cn("rounded-full border px-3 py-1.5 text-xs", levelStyles[selectedCongestion.level])}>
+                    {selectedCongestion.level} estimate
+                  </span>
+                ) : null}
               </div>
+
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                  <Metric label="Est. passengers" value={`~${(selectedCongestion?.estimatedPassengers ?? selected.congestion.estimatedPassengers).toLocaleString()}`} />
-                  <Metric label="Incoming" value={String(selectedCongestion?.incomingTrains ?? selected.congestion.incomingTrains)} />
-                  <Metric label="Outgoing" value={String(selectedCongestion?.outgoingTrains ?? selected.congestion.outgoingTrains)} />
+                <Metric label="Estimated passengers" value={selectedCongestion ? `~${selectedCongestion.estimatedPassengers.toLocaleString()}` : "—"} />
+                <Metric label="Incoming trains" value={selectedCongestion ? String(selectedCongestion.incomingTrains) : "—"} />
+                <Metric label="Outgoing trains" value={selectedCongestion ? String(selectedCongestion.outgoingTrains) : "—"} />
               </div>
+
+              {congestionResource.status === "api" && !selectedCongestion ? (
+                <p className="mt-4 text-sm text-slate-400">No congestion record was returned for this station.</p>
+              ) : null}
+
               {busiestPlatform && busiestPlatform.level !== "Low" ? (
-                <div role="alert" className={cn("mt-4 rounded-xl border p-3 text-sm", levelStyles[busiestPlatform.level])}>
-                  <p className="font-medium">Simulated congestion alert · Platform {busiestPlatform.platform}</p>
-                  <p className="mt-1 text-xs opacity-80">{busiestPlatform.level} estimate at {busiestPlatform.densityPercent}% density. This alert is generated from deterministic demo data.</p>
+                <div role="note" className={cn("mt-4 rounded-xl border p-3 text-sm", levelStyles[busiestPlatform.level])}>
+                  <p className="font-medium">Backend estimate · Platform {busiestPlatform.platform}</p>
+                  <p className="mt-1 text-xs opacity-80">{busiestPlatform.level} estimate at {busiestPlatform.densityPercent}% density; not an observed passenger count.</p>
                 </div>
               ) : null}
+
               <div className="mt-5">
-                <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-medium text-white">Platform heatmap</h3><span className="text-[11px] text-slate-500">Select a platform for its simulated density</span></div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                  {(selectedCongestion?.platforms ?? selected.congestion.platforms).map((platform) => (
-                    <button key={platform.platform} type="button" aria-pressed={selectedPlatform?.platform === platform.platform} title={`Platform ${platform.platform}: ${platform.level} simulated congestion`} onClick={() => setPlatformId(platform.platform)}
-                      className={cn("rounded-xl border p-2 text-center transition hover:brightness-125", heatStyles[platform.level], selectedPlatform?.platform === platform.platform && "ring-2 ring-white/80")}>
-                      <p className="text-[11px] text-slate-300">PF {platform.platform}</p><p className="mt-1 text-sm font-semibold text-white">{platform.densityPercent}%</p>
-                    </button>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-white">Platform estimates</h3>
+                  <span className="text-[11px] text-slate-500">Values returned by the backend</span>
+                </div>
+                {selectedCongestion?.platforms.length ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                    {selectedCongestion.platforms.map((platform) => (
+                      <button
+                        key={platform.platform}
+                        type="button"
+                        aria-pressed={selectedPlatform?.platform === platform.platform}
+                        title={`Platform ${platform.platform}: backend estimate ${platform.densityPercent}%`}
+                        onClick={() => setPlatformId(platform.platform)}
+                        className={cn("rounded-xl border p-2 text-center transition hover:brightness-125", heatStyles[platform.level], selectedPlatform?.platform === platform.platform && "ring-2 ring-white/80")}
+                      >
+                        <p className="text-[11px] text-slate-300">PF {platform.platform}</p>
+                        <p className="mt-1 text-sm font-semibold text-white">{platform.densityPercent}%</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No platform congestion records are available.</p>
+                )}
+                {selectedPlatform ? (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="flex flex-wrap justify-between gap-2 text-xs">
+                      <span className="text-slate-200">Platform {selectedPlatform.platform} · {selectedPlatform.level}</span>
+                      <span className="text-slate-400">Estimated passengers: {selectedPlatform.estimatedPassengers}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Linked backend train records: {selectedPlatform.trainNumbers.length ? selectedPlatform.trainNumbers.join(", ") : "none"}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-400">
+                  {congestionLevels.map((level) => (
+                    <span key={level} className="flex items-center gap-1.5">
+                      <i className={cn("size-2 rounded-sm", heatStyles[level])} />{level}
+                    </span>
                   ))}
                 </div>
-                {selectedPlatform ? <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex flex-wrap justify-between gap-2 text-xs"><span className="text-slate-200">Platform {selectedPlatform.platform} · {selectedPlatform.level}</span><span className="text-slate-400">~{selectedPlatform.estimatedPassengers} simulated passengers</span></div>
-                  <p className="mt-1 text-[11px] text-slate-500">{selectedPlatform.trainNumbers.length ? `Linked mock train services: ${selectedPlatform.trainNumbers.join(", ")}` : "No mock train services assigned to this platform."}</p>
-                </div> : null}
-                <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-400">{congestionLevels.map((level) => <span key={level} className="flex items-center gap-1.5"><i className={cn("size-2 rounded-sm", heatStyles[level])} />{level}</span>)}</div>
-              </div>
-              <div className="mt-5 h-56">
-                <h3 className="mb-2 text-sm font-medium text-white">
-                  {historyResource.status === "api" ? "Recorded congestion history" : "Illustrative congestion history"}
-                </h3>
-                {historyResource.status === "api" && apiHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400">No historical snapshots are recorded for this station yet.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    {historyResource.status === "api" ? (
-                      <LineChart data={apiHistory}>
-                        <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
-                        <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                        <Line type="monotone" dataKey="activityScore" name="Activity score" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 3 }} />
-                      </LineChart>
-                    ) : (
-                      <BarChart data={stationHistory}>
-                        <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
-                        <XAxis dataKey="platform" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
-                        <Bar dataKey="morning" name="Morning" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="afternoon" name="Afternoon" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="current" name="Current estimate" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    )}
-                  </ResponsiveContainer>
-                )}
               </div>
             </GlassCard>
+
             <GlassCard>
-              <h3 className="text-sm font-medium text-white">Suggested simulation actions</h3>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-                <li>• {(selectedCongestion?.level ?? selected.congestion.level) === "Critical" || (selectedCongestion?.level ?? selected.congestion.level) === "High" ? "Prioritize a platform-flow review and consider staggered boarding in this scenario." : "Continue routine platform monitoring in this scenario."}</li>
-                <li>• Check the arrival sequence for {selectedCongestion?.incomingTrains ?? selected.congestion.incomingTrains} simulated inbound services.</li>
-                <li>• Coordinate station updates with the control desk before any real-world action.</li>
-              </ul>
+              <h3 className="text-sm font-medium text-white">Backend-recorded congestion history</h3>
+              {historyResource.status === "api" && apiHistory.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-400">No historical snapshots are recorded for this station.</p>
+              ) : apiHistory.length ? (
+                <div className="mt-4 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={apiHistory}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                      <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: "#0b1428", border: "1px solid rgba(34,211,238,.2)", borderRadius: 12 }} />
+                      <Line type="monotone" dataKey="activityScore" name="Backend activity estimate" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : null}
+              <p className="mt-3 text-[11px] leading-5 text-slate-500">
+                Historical values come from backend congestion snapshots and may be generated estimates.
+              </p>
             </GlassCard>
           </div>
-        ) : <GlassCard><p className="text-sm text-slate-400">No station data is available.</p></GlassCard>}
+        ) : (
+          <GlassCard>
+            <p className="text-sm text-slate-400">Select a backend station record to load congestion information.</p>
+          </GlassCard>
+        )}
       </div>
     </div>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p><p className="mt-1 text-lg font-semibold text-white">{value}</p></div>;
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    </div>
+  );
 }

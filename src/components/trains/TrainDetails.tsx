@@ -6,10 +6,16 @@ import { cn, etaForTrain, formatDelay, stationById } from "@/lib/utils";
 import { Clock3, Gauge, MapPin, Users } from "lucide-react";
 
 export function TrainDetails() {
-  const { selectedTrain, stations } = useRailTrack();
+  const { selectedTrain, stations, trains } = useRailTrack();
 
   if (!selectedTrain) {
-    return <p className="p-6 text-sm text-slate-400">Select a train to inspect route, platform and ETA.</p>;
+    return (
+      <p className="p-6 text-sm text-slate-400">
+        {trains.length === 0
+          ? "No backend train records are available."
+          : "Select a train to inspect route, platform and ETA."}
+      </p>
+    );
   }
 
   const origin = stationById(stations, selectedTrain.from);
@@ -50,7 +56,7 @@ export function TrainDetails() {
           />
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          {Math.round(selectedTrain.progress * 100)}% of {selectedTrain.distanceKm} km · {selectedTrain.coaches} coaches
+          {Math.round(selectedTrain.progress * 100)}% backend-reported route progress · {selectedTrain.coaches} coaches
         </p>
       </div>
 

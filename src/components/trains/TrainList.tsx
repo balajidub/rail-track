@@ -5,11 +5,15 @@ import { useRailTrack } from "@/context/RailTrackContext";
 import { cn, formatDelay } from "@/lib/utils";
 
 export function TrainList({ limit }: { limit?: number }) {
-  const { filteredTrains, selectedTrainId, selectTrain, settings } = useRailTrack();
+  const { trains, filteredTrains, selectedTrainId, selectTrain, settings } = useRailTrack();
   const rows = limit ? filteredTrains.slice(0, limit) : filteredTrains;
 
   if (rows.length === 0) {
-    return <p className="px-4 py-8 text-center text-sm text-slate-400">No trains match the current filters.</p>;
+    return (
+      <p className="px-4 py-8 text-center text-sm text-slate-400">
+        {trains.length === 0 ? "No backend train records are available." : "No trains match the current filters."}
+      </p>
+    );
   }
 
   return (

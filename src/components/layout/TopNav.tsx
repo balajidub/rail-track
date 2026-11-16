@@ -19,6 +19,13 @@ export function TopNav() {
     settings,
   } = useRailTrack();
   const [open, setOpen] = useState(false);
+  const operatorName = settings.operatorName.trim() || "Operator";
+  const operatorInitials = operatorName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-cyan-400/10 bg-[#08101f]/80 px-4 py-3 backdrop-blur-xl lg:px-6">
@@ -46,7 +53,7 @@ export function TopNav() {
 
       <div className="hidden items-center gap-2 rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-300 md:flex">
         <ShieldCheck className="size-3.5" />
-        IST {clock}
+        IST {clock || "--:--:--"}
       </div>
 
       <div className="relative">
@@ -79,21 +86,25 @@ export function TopNav() {
                 </button>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {alerts.slice(0, 6).map((alert) => (
-                  <button
-                    key={alert.id}
-                    type="button"
-                    onClick={() => markAlertRead(alert.id)}
-                    className="block w-full border-b border-white/5 px-4 py-3 text-left hover:bg-white/5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm text-slate-100">{alert.title}</p>
-                      {!alert.read ? <span className="size-1.5 rounded-full bg-cyan-400" /> : null}
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-slate-400">{alert.message}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">{alert.time}</p>
-                  </button>
-                ))}
+                {alerts.length === 0 ? (
+                  <p className="px-4 py-5 text-sm text-slate-400">No matching backend delay records.</p>
+                ) : (
+                  alerts.slice(0, 6).map((alert) => (
+                    <button
+                      key={alert.id}
+                      type="button"
+                      onClick={() => markAlertRead(alert.id)}
+                      className="block w-full border-b border-white/5 px-4 py-3 text-left hover:bg-white/5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-slate-100">{alert.title}</p>
+                        {!alert.read ? <span className="size-1.5 rounded-full bg-cyan-400" /> : null}
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">{alert.message}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">{alert.time}</p>
+                    </button>
+                  ))
+                )}
               </div>
             </motion.div>
           ) : null}
@@ -106,15 +117,11 @@ export function TopNav() {
         className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 py-1.5 pl-1.5 pr-3"
       >
         <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-xs font-semibold text-slate-950">
-          {settings.operatorName
-            .split(" ")
-            .map((part) => part[0])
-            .join("")
-            .slice(0, 2)}
+          {operatorInitials}
         </span>
         <span className="hidden text-left sm:block">
-          <span className="block text-sm font-medium text-white">{settings.operatorName}</span>
-          <span className="block text-[11px] text-slate-400">Network engineer</span>
+          <span className="block text-sm font-medium text-white">{operatorName}</span>
+          <span className="block text-[11px] text-slate-400">Operator profile</span>
         </span>
       </button>
     </header>

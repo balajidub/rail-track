@@ -8,7 +8,6 @@ import com.railtrack.dto.RouteComparisonRequest;
 import com.railtrack.dto.RouteComparisonResponse;
 import com.railtrack.entity.RailwayRoute;
 import com.railtrack.entity.Train;
-import com.railtrack.exception.NoRouteException;
 import com.railtrack.exception.ResourceNotFoundException;
 import com.railtrack.intelligence.RouteOptimizationEngine;
 import com.railtrack.repository.RailwayRouteRepository;
@@ -44,9 +43,6 @@ public class RouteOptimizationService {
                 selectedTrain,
                 trains,
                 routeRepository.findAllByActiveTrue());
-        if (alternatives.isEmpty()) {
-            throw new NoRouteException("No simulated route connects the selected train's endpoints.");
-        }
         return new RouteComparisonResponse(selectedTrain.getId(), alternatives, NOTICE);
     }
 

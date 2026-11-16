@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage, isBackendConfigured } from "@/lib/api";
 
-export type ApiResourceStatus = "mock" | "loading" | "api" | "error";
+export type ApiResourceStatus = "idle" | "loading" | "api" | "error" | "unavailable";
 
 type ApiResourceResult<T> =
   | { key: string; version: number; status: "api"; data: T }
@@ -12,7 +12,6 @@ type ApiResourceResult<T> =
 export function useApiResource<T>(
   key: string,
   fetcher: () => Promise<T>,
-  fallback: T,
   enabled = true,
 ) {
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -50,16 +49,22 @@ export function useApiResource<T>(
     result?.key === key && result.version === refreshVersion
       ? result
       : null;
-  const status: ApiResourceStatus = !isBackendConfigured || !enabled
-    ? "mock"
-    : !currentResult
-      ? "loading"
-      : currentResult.status;
+  const status: ApiResourceStatus = !isBackendConfigured
+    ? "unavailable"
+    : !enabled
+      ? "idle"
+      : !currentResult
+        ? "loading"
+        : currentResult.status;
 
   return {
-    data: currentResult?.status === "api" ? currentResult.data : fallback,
+    data: isBackendConfigured && enabled && currentResult?.status === "api"
+      ? currentResult.data
+      : null,
     status,
-    error: currentResult?.status === "error" ? currentResult.error : null,
+    error: isBackendConfigured && enabled && currentResult?.status === "error"
+      ? currentResult.error
+      : null,
     refresh,
     setData,
   };

@@ -81,23 +81,6 @@ export interface DelayAlert {
   read: boolean;
 }
 
-export interface HourlyTraffic {
-  hour: string;
-  running: number;
-  delayed: number;
-}
-
-export interface PunctualityPoint {
-  day: string;
-  onTime: number;
-  delayed: number;
-}
-
-export interface CorridorDelay {
-  corridor: string;
-  minutes: number;
-}
-
 export type PredictionRisk = "Low" | "Medium" | "High" | "Critical";
 
 export interface DelayPrediction {

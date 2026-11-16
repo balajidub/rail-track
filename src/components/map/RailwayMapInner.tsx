@@ -2,9 +2,9 @@
 
 import { useRailTrack } from "@/context/RailTrackContext";
 import { formatDelay, stationById, trainPosition } from "@/lib/utils";
-import type { Station, Train, TrainStatus } from "@/types/railway";
+import type { Station, TrainStatus } from "@/types/railway";
 import { LocateFixed, ScanSearch } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect } from "react";
 import type { MouseEvent } from "react";
 import {
   CircleMarker,
@@ -25,13 +25,6 @@ const statusColors: Record<TrainStatus, string> = {
 };
 
 const INDIA_CENTER: [number, number] = [22.8, 79.2];
-type Position = { lat: number; lng: number };
-
-function positionsForTrains(trains: Train[], stations: Station[]): Record<string, Position> {
-  return Object.fromEntries(
-    trains.map((train) => [train.id, trainPosition(train, stations)]),
-  );
-}
 
 function FlyToSelection({
   trainId,
@@ -43,17 +36,12 @@ function FlyToSelection({
   lng: number;
 }) {
   const map = useMap();
-  const position = useRef<[number, number]>([lat, lng]);
-
-  useEffect(() => {
-    position.current = [lat, lng];
-  }, [lat, lng]);
 
   useEffect(() => {
     if (trainId) {
-      map.flyTo(position.current, 6.2, { duration: 0.85 });
+      map.flyTo([lat, lng], 6.2, { duration: 0.85 });
     }
-  }, [trainId, map]);
+  }, [trainId, lat, lng, map]);
 
   return null;
 }
@@ -87,52 +75,6 @@ function MapActions({ stations }: { stations: Station[] }) {
   );
 }
 
-function useAnimatedTrainPositions(trains: Train[], stations: Station[]) {
-  const initialPositions = useMemo(
-    () => positionsForTrains(trains, stations),
-    [trains, stations],
-  );
-  const [positions, setPositions] = useState(initialPositions);
-  const positionsRef = useRef(initialPositions);
-
-  useEffect(() => {
-    const starts = Object.fromEntries(
-      trains.map((train) => [
-        train.id,
-        positionsRef.current[train.id] ?? trainPosition(train, stations),
-      ]),
-    );
-    const targets = positionsForTrains(trains, stations);
-    const startedAt = performance.now();
-    let frame = 0;
-
-    const animate = (now: number) => {
-      const progress = Math.min((now - startedAt) / 2600, 1);
-      const next = Object.fromEntries(
-        trains.map((train) => {
-          const start = starts[train.id];
-          const target = targets[train.id];
-          return [
-            train.id,
-            {
-              lat: start.lat + (target.lat - start.lat) * progress,
-              lng: start.lng + (target.lng - start.lng) * progress,
-            },
-          ];
-        }),
-      );
-      positionsRef.current = next;
-      setPositions(next);
-      if (progress < 1) frame = requestAnimationFrame(animate);
-    };
-
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [trains, stations]);
-
-  return positions;
-}
-
 function TrainStatusLegend() {
   const entries: Array<{ status: TrainStatus; label: string }> = [
     { status: "on-time", label: "On time" },
@@ -154,11 +96,8 @@ function TrainStatusLegend() {
 }
 
 export default function RailwayMapInner({ tall = false }: { tall?: boolean }) {
-  const { trains, filteredTrains, stations, selectedTrain, selectTrain, setView } = useRailTrack();
-  const positions = useAnimatedTrainPositions(trains, stations);
-  const selectedPosition = selectedTrain
-    ? positions[selectedTrain.id] ?? trainPosition(selectedTrain, stations)
-    : { lat: INDIA_CENTER[0], lng: INDIA_CENTER[1] };
+  const { filteredTrains, stations, selectedTrain, selectTrain, setView } = useRailTrack();
+  const selectedPosition = selectedTrain ? trainPosition(selectedTrain, stations) : null;
 
   return (
     <div
@@ -178,11 +117,13 @@ export default function RailwayMapInner({ tall = false }: { tall?: boolean }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FlyToSelection
-          trainId={selectedTrain?.id ?? null}
-          lat={selectedPosition.lat}
-          lng={selectedPosition.lng}
-        />
+        {selectedTrain && selectedPosition ? (
+          <FlyToSelection
+            trainId={selectedTrain.id}
+            lat={selectedPosition.lat}
+            lng={selectedPosition.lng}
+          />
+        ) : null}
         <MapActions stations={stations} />
 
         {stations.map((station) => (
@@ -229,7 +170,8 @@ export default function RailwayMapInner({ tall = false }: { tall?: boolean }) {
         })}
 
         {filteredTrains.map((train) => {
-          const position = positions[train.id] ?? trainPosition(train, stations);
+          const position = trainPosition(train, stations);
+          if (!position) return null;
           const selected = train.id === selectedTrain?.id;
           const current = stationById(stations, train.currentStationId);
           const next = stationById(stations, train.nextStationId);
@@ -258,8 +200,8 @@ export default function RailwayMapInner({ tall = false }: { tall?: boolean }) {
                   <strong>{train.number} · {train.name}</strong>
                   <div className="capitalize">{train.status.replace("-", " ")}</div>
                   <div>{train.speed} km/h · {formatDelay(train.delayMinutes)}</div>
-                  <div>Near {current?.name ?? "route"} · next {next?.name ?? "—"}</div>
-                  <div>{Math.round(train.progress * 100)}% route progress</div>
+                  <div>Last reported station: {current?.name ?? "—"}</div>
+                  <div>Next listed stop: {next?.name ?? "—"}</div>
                 </div>
               </Popup>
             </CircleMarker>
@@ -267,7 +209,6 @@ export default function RailwayMapInner({ tall = false }: { tall?: boolean }) {
         })}
       </MapContainer>
       <TrainStatusLegend />
-      <span className="leaflet-demo-label">DEMO SIMULATION</span>
     </div>
   );
 }

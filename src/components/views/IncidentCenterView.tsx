@@ -2,8 +2,7 @@
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRailTrack } from "@/context/RailTrackContext";
-import { errorMessage } from "@/lib/api";
-import { incidentSeverityColor } from "@/lib/intelligence";
+import { errorMessage, isBackendConfigured } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Incident, IncidentCategory, IncidentPriority, IncidentSeverity, IncidentStatus } from "@/types/railway";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -20,6 +19,12 @@ const severities: IncidentSeverity[] = ["Low", "Medium", "High", "Critical"];
 const priorities: IncidentPriority[] = ["Routine", "Elevated", "Urgent"];
 const statuses: Array<"All" | IncidentStatus> = ["All", "Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"];
 const workflow: IncidentStatus[] = ["Reported", "Acknowledged", "Response Assigned", "In Progress", "Resolved"];
+const severityStyles: Record<IncidentSeverity, string> = {
+  Low: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+  Medium: "border-amber-400/20 bg-amber-400/10 text-amber-300",
+  High: "border-orange-400/20 bg-orange-400/10 text-orange-300",
+  Critical: "border-rose-400/20 bg-rose-400/10 text-rose-300",
+};
 
 interface IncidentDraft {
   title: string;
@@ -144,17 +149,17 @@ export function IncidentCenterView() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">V2 · response workflow</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Response workflow</p>
           <h1 className="mt-1 text-3xl font-semibold text-white">Incident management center</h1>
-          <p className="mt-1 text-sm text-slate-400">Fictional scenarios only. Changes are saved to the configured demo backend or retained in local demo state.</p>
+          <p className="mt-1 text-sm text-slate-400">Backend incident records. Reports save to RailTrack only and are not sent to railway operators.</p>
         </div>
-        <button type="button" onClick={beginCreate} className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2.5 text-sm font-medium text-slate-950">
+        <button type="button" onClick={beginCreate} disabled={!isBackendConfigured} className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2.5 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
           {showForm && !editing ? "Hide report form" : "＋ Report incident"}
         </button>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Summary label="Total scenarios" value={incidents.length} />
+        <Summary label="Total incidents" value={incidents.length} />
         <Summary label="Active incidents" value={activeCount} />
         <Summary label="Critical active" value={criticalCount} />
       </div>
@@ -162,7 +167,7 @@ export function IncidentCenterView() {
       {showForm ? (
         <GlassCard>
           <div className="flex items-start justify-between gap-3">
-            <div><h2 className="text-base font-medium text-white">{editing ? "Edit incident" : "Report a simulated incident"}</h2><p className="mt-1 text-xs text-slate-400">No external operational systems are contacted.</p></div>
+            <div><h2 className="text-base font-medium text-white">{editing ? "Edit incident" : "Report incident"}</h2><p className="mt-1 text-xs text-slate-400">Changes are saved to the configured backend only.</p></div>
             <button type="button" onClick={() => { setShowForm(false); setEditing(false); }} className="text-xs text-slate-400 hover:text-white">Cancel</button>
           </div>
           <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -172,7 +177,7 @@ export function IncidentCenterView() {
             <Field label="Priority"><select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as IncidentPriority })} className="select-field">{priorities.map((priority) => <option key={priority}>{priority}</option>)}</select></Field>
             <Field label="Linked train"><select value={draft.trainId} onChange={(event) => setDraft({ ...draft, trainId: event.target.value })} className="select-field"><option value="">No linked train</option>{trains.map((train) => <option key={train.id} value={train.id}>{train.number} · {train.name}</option>)}</select></Field>
             <Field label="Linked station"><select value={draft.stationId} onChange={(event) => setDraft({ ...draft, stationId: event.target.value })} className="select-field"><option value="">No linked station</option>{stations.map((station) => <option key={station.id} value={station.id}>{station.code} · {station.name}</option>)}</select></Field>
-            <Field label="Description"><textarea required maxLength={500} rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="select-field h-auto min-h-20 py-2" placeholder="Describe this simulated scenario" /></Field>
+            <Field label="Description"><textarea required maxLength={500} rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="select-field h-auto min-h-20 py-2" placeholder="Describe the incident" /></Field>
             <div className="flex items-end gap-3"><button type="submit" className="h-11 rounded-xl bg-cyan-400 px-4 text-sm font-medium text-slate-950">{editing ? "Save changes" : "Create incident"}</button>{formError ? <p role="alert" className="pb-2 text-xs text-rose-300">{formError}</p> : null}</div>
           </form>
         </GlassCard>
@@ -188,13 +193,13 @@ export function IncidentCenterView() {
             <select id="incident-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as "updated" | "severity")} className="select-field"><option value="updated">Recently updated</option><option value="severity">Highest severity</option></select>
           </div>
           <div className="max-h-[650px] overflow-y-auto">
-            {filtered.length === 0 ? <p className="p-5 text-sm text-slate-400">No incidents match this filter.</p> :
+            {filtered.length === 0 ? <p className="p-5 text-sm text-slate-400">{incidents.length === 0 ? "No backend incident records are available." : "No incidents match this filter."}</p> :
               filtered.map((incident) => (
                 <button key={incident.id} type="button" onClick={() => { setSelectedId(incident.id); setShowForm(false); setEditing(false); }}
                   className={cn("w-full border-b border-white/5 p-4 text-left hover:bg-white/[0.04]", selected?.id === incident.id && "bg-cyan-400/[0.07]")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-[11px] text-slate-500">{incident.id}</span>
-                    <span className={cn("rounded-full border px-2 py-1 text-[10px]", incidentSeverityColor(incident.severity))}>{incident.severity}</span>
+                    <span className={cn("rounded-full border px-2 py-1 text-[10px]", severityStyles[incident.severity])}>{incident.severity}</span>
                   </div>
                   <p className="mt-2 text-sm font-medium text-white">{incident.title}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400"><span>{incident.category}</span><span>·</span><span className={cn("rounded-full border px-2 py-0.5", statusStyle(incident.status))}>{incident.status}</span></div>
@@ -208,7 +213,7 @@ export function IncidentCenterView() {
             <GlassCard>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="font-mono text-xs text-cyan-300">{selected.id} · {selected.category}</p><h2 className="mt-1 text-xl font-semibold text-white">{selected.title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{selected.description}</p></div>
-                <span className={cn("rounded-full border px-3 py-1.5 text-xs", incidentSeverityColor(selected.severity))}>{selected.severity} · {selected.priority}</span>
+                <span className={cn("rounded-full border px-3 py-1.5 text-xs", severityStyles[selected.severity])}>{selected.severity} · {selected.priority}</span>
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <Info label="Linked train" value={trains.find((train) => train.id === selected.trainId)?.number ?? "None"} />

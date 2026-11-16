@@ -10,11 +10,15 @@ import { useMemo, useState, type ReactNode } from "react";
 
 export function JourneyPlannerView() {
   const { stations, trains, selectTrain, setView } = useRailTrack();
-  const [fromId, setFromId] = useState("NDLS");
-  const [toId, setToId] = useState("BPL");
-  const [travelClass, setTravelClass] = useState("EC");
-  const [date, setDate] = useState("2026-11-08");
-  const [submitted, setSubmitted] = useState(true);
+  const [fromSelection, setFromSelection] = useState("");
+  const [toSelection, setToSelection] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const fromId = stations.some((station) => station.id === fromSelection)
+    ? fromSelection
+    : stations[0]?.id ?? "";
+  const toId = stations.some((station) => station.id === toSelection)
+    ? toSelection
+    : stations[1]?.id ?? stations[0]?.id ?? "";
 
   const results = useMemo(() => {
     if (!submitted) return [] as Train[];
@@ -22,8 +26,8 @@ export function JourneyPlannerView() {
   }, [submitted, trains, fromId, toId]);
 
   const swap = () => {
-    setFromId(toId);
-    setToId(fromId);
+    setFromSelection(toId);
+    setToSelection(fromId);
   };
 
   return (
@@ -31,13 +35,14 @@ export function JourneyPlannerView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Journey planner</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Plan a corridor hop</h1>
-        <p className="mt-1 text-sm text-slate-400">Results are generated from the mock timetable, not live IRCTC inventory.</p>
+        <p className="mt-1 text-sm text-slate-400">Search scheduled stops in backend train records. Ticket availability is not provided.</p>
       </div>
 
       <GlassCard>
         <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
           <Field label="From">
-            <select value={fromId} onChange={(event) => setFromId(event.target.value)} className="select-field">
+            <select value={fromId} onChange={(event) => setFromSelection(event.target.value)} className="select-field">
+              <option value="" disabled>Select station</option>
               {stations.map((station) => (
                 <option key={station.id} value={station.id}>
                   {station.name} ({station.code})
@@ -54,7 +59,8 @@ export function JourneyPlannerView() {
             <ArrowRightLeft className="size-4" />
           </button>
           <Field label="To">
-            <select value={toId} onChange={(event) => setToId(event.target.value)} className="select-field">
+            <select value={toId} onChange={(event) => setToSelection(event.target.value)} className="select-field">
+              <option value="" disabled>Select station</option>
               {stations.map((station) => (
                 <option key={station.id} value={station.id}>
                   {station.name} ({station.code})
@@ -63,24 +69,12 @@ export function JourneyPlannerView() {
             </select>
           </Field>
         </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <Field label="Travel date">
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="select-field" />
-          </Field>
-          <Field label="Class">
-            <select value={travelClass} onChange={(event) => setTravelClass(event.target.value)} className="select-field">
-              <option value="EC">Vande Bharat / EC</option>
-              <option value="CC">Chair Car</option>
-              <option value="3A">AC 3 Tier</option>
-              <option value="2A">AC 2 Tier</option>
-              <option value="1A">AC First</option>
-              <option value="SL">Sleeper</option>
-            </select>
-          </Field>
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={() => setSubmitted(true)}
-            className="mt-6 h-11 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 text-sm font-medium text-slate-950"
+            disabled={!fromId || !toId || fromId === toId}
+            className="h-11 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Find journeys
           </button>
@@ -90,7 +84,15 @@ export function JourneyPlannerView() {
       <div className="space-y-3">
         {results.length === 0 ? (
           <GlassCard>
-            <p className="text-sm text-slate-400">No through services on this mock corridor. Try New Delhi to Bhopal or Howrah.</p>
+            <p className="text-sm text-slate-400">
+              {!stations.length
+                ? "No backend station records are available."
+                : !trains.length
+                  ? "No backend train schedule records are available."
+                  : submitted
+                    ? "No backend train record connects these stations in this direction."
+                    : "Choose two stations to search the available backend schedules."}
+            </p>
           </GlassCard>
         ) : (
           results.map((train) => {
@@ -121,8 +123,6 @@ export function JourneyPlannerView() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-300">
                   <span>{train.type}</span>
-                  <span>Class {travelClass}</span>
-                  <span>{date}</span>
                   <span>ETA {etaForTrain(train)}</span>
                   <span>{formatDelay(train.delayMinutes)}</span>
                 </div>

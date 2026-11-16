@@ -14,7 +14,6 @@ import {
   Settings,
   TrainFront,
   Landmark,
-  Radio,
   BrainCircuit,
   Activity,
   ShieldAlert,
@@ -28,12 +27,12 @@ const items: Array<{
   icon: typeof LayoutDashboard;
 }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "tracking", label: "Live Tracking", icon: MapPinned },
+  { id: "tracking", label: "Train Map", icon: MapPinned },
   { id: "trains", label: "Find Trains", icon: Search },
   { id: "planner", label: "Journey Planner", icon: Route },
   { id: "stations", label: "Stations", icon: Landmark },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "predictions", label: "AI Predictions", icon: BrainCircuit },
+  { id: "predictions", label: "Delay Estimates", icon: BrainCircuit },
   { id: "station-intelligence", label: "Station Intelligence", icon: Activity },
   { id: "incidents", label: "Incident Center", icon: ShieldAlert },
   { id: "coaches", label: "Coach Intelligence", icon: Users },
@@ -48,13 +47,10 @@ export function Sidebar() {
     sidebarOpen,
     setSidebarOpen,
     trains,
+    backendStatus,
   } = useRailTrack();
 
-  const live = trains.filter(
-    (train) =>
-      train.status !== "cancelled" &&
-      train.status !== "arrived"
-  ).length;
+  const hasBackendRecords = backendStatus === "connected" || backendStatus === "partial";
 
   return (
     <>
@@ -83,26 +79,22 @@ export function Sidebar() {
             <p className="text-xl font-bold tracking-tight text-slate-100">
               RailTrack
             </p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
-              Real-Time Train Tracking and Live Status Visualization System
-            </p>
           </div>
         </div>
 
-        {/* Network status */}
         <div className="mb-7 rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
           <div className="flex items-center gap-2 text-cyan-300">
-            <Radio className="size-4" />
+            <Activity className="size-4" />
             <span className="text-xs font-bold uppercase tracking-wider">
-              Demo Simulation
+              Backend records
             </span>
           </div>
 
           <p className="mt-2 text-2xl font-bold text-white">
-            {live}
+            {hasBackendRecords ? trains.length : "—"}
           </p>
           <p className="text-xs text-slate-400">
-            Simulated trains in motion
+            {hasBackendRecords ? "Train records returned" : "Backend data unavailable"}
           </p>
         </div>
 

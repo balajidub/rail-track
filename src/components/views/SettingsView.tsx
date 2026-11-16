@@ -14,8 +14,6 @@ export function SettingsView() {
   const simulation = useApiResource<SimulationStatus | null>(
     "simulation-status",
     railTrackApi.getSimulationStatus,
-    null,
-    isBackendConfigured,
   );
 
   const runAction = async (action: string, operation: () => Promise<SimulationStatus>) => {
@@ -36,7 +34,7 @@ export function SettingsView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Settings</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Control room preferences</h1>
-        <p className="mt-1 text-sm text-slate-400">Stored in local React state for this prototype session.</p>
+        <p className="mt-1 text-sm text-slate-400">Preferences apply to this browser session.</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -48,6 +46,7 @@ export function SettingsView() {
               value={settings.operatorName}
               onChange={(event) => updateSettings({ operatorName: event.target.value })}
               className="select-field"
+              placeholder="Operator name"
             />
           </label>
           <label className="mt-4 block">
@@ -56,14 +55,15 @@ export function SettingsView() {
               value={settings.controlRoom}
               onChange={(event) => updateSettings({ controlRoom: event.target.value })}
               className="select-field"
+              placeholder="Control room name"
             />
           </label>
         </GlassCard>
 
         <GlassCard>
-          <h2 className="text-sm font-medium text-white">Live board</h2>
+          <h2 className="text-sm font-medium text-white">Board behavior</h2>
           <Toggle
-            label="Auto-refresh train positions"
+            label="Auto-refresh backend records"
             checked={settings.autoRefresh}
             onChange={(checked) => updateSettings({ autoRefresh: checked })}
           />
@@ -73,7 +73,7 @@ export function SettingsView() {
             onChange={(checked) => updateSettings({ compactLists: checked })}
           />
           <Toggle
-            label="Push delay alerts"
+            label="Show delay notifications"
             checked={settings.pushAlerts}
             onChange={(checked) => updateSettings({ pushAlerts: checked })}
           />
@@ -96,9 +96,9 @@ export function SettingsView() {
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-medium text-white">Backend demo simulation</h2>
+            <h2 className="text-sm font-medium text-white">Backend simulation controls</h2>
             <p className="mt-1 text-xs text-slate-400">
-              Controls the fictional Spring Boot simulation only; this is not connected to railway operations.
+              Controls backend-generated train data. No railway operator or external live feed is connected.
             </p>
           </div>
           {simulation.data ? (
@@ -120,7 +120,7 @@ export function SettingsView() {
             </div>
             {simulation.data ? (
               <p className="mt-3 text-xs text-slate-400">
-                Simulated time: {new Date(simulation.data.simulatedAt).toLocaleString()} · mode: {simulation.data.mode}
+                Backend simulation time: {new Date(simulation.data.simulatedAt).toLocaleString()} · mode: {simulation.data.mode}
               </p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -162,13 +162,6 @@ export function SettingsView() {
         )}
       </GlassCard>
 
-      <GlassCard>
-        <h2 className="text-sm font-medium text-white">Prototype notes</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          RailTrack is a DEMO SIMULATION command center. Train, delay and passenger values are fictional; no live railway,
-          booking, or operational systems are connected.
-        </p>
-      </GlassCard>
     </div>
   );
 }

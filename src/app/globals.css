@@ -216,23 +216,6 @@ button {
   border-radius: 50%;
 }
 
-.leaflet-demo-label {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  z-index: 800;
-  transform: translateX(-50%);
-  border: 1px solid rgba(34, 211, 238, 0.28);
-  border-radius: 999px;
-  padding: 6px 10px;
-  color: #a5f3fc;
-  background: rgba(7, 11, 20, 0.88);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  white-space: nowrap;
-}
-
 @media (max-width: 640px) {
   .glass-panel {
     border-radius: 12px;

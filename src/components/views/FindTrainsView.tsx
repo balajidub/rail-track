@@ -18,7 +18,7 @@ export function FindTrainsView() {
     <div className="space-y-5">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Find trains</p>
-        <h1 className="mt-1 text-3xl font-semibold text-white">Search the fictional timetable</h1>
+        <h1 className="mt-1 text-3xl font-semibold text-white">Search backend train records</h1>
         <p className="mt-1 text-sm text-slate-400">{filteredTrains.length} services match the current query and filters.</p>
       </div>
 

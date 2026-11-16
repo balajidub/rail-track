@@ -8,16 +8,15 @@ import { useRailTrack } from "@/context/RailTrackContext";
 
 export function LiveTrackingView() {
   const { trains, query, setQuery, statusFilter, setStatusFilter, filteredTrains } = useRailTrack();
-  const moving = trains.filter((train) => train.status !== "cancelled").length;
   const statuses = ["all", "on-time", "delayed", "cancelled", "arrived"] as const;
 
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Live tracking</p>
-        <h1 className="mt-1 text-3xl font-semibold text-white">National railway map</h1>
+        <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Train map</p>
+        <h1 className="mt-1 text-3xl font-semibold text-white">Train locations</h1>
         <p className="mt-1 text-sm text-slate-400">
-          DEMO SIMULATION · {moving} services plotted with simulated positions and corridors.
+          Last reported stations from backend records; no external live positioning feed is configured.
         </p>
       </div>
 
@@ -46,7 +45,7 @@ export function LiveTrackingView() {
           ))}
         </select>
         <p className="text-xs text-slate-400" aria-live="polite">
-          {filteredTrains.length} of {trains.length} trains
+          {filteredTrains.length} of {trains.length} backend train records
         </p>
       </GlassCard>
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { hourlyTraffic, punctualityTrend } from "@/data/mock";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRailTrack } from "@/context/RailTrackContext";
+import { errorMessage, isBackendConfigured, railTrackApi, type TrainSummaryResponse } from "@/lib/api";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   ResponsiveContainer,
@@ -20,37 +20,177 @@ const tooltipStyle = {
 };
 
 export function MiniAnalytics() {
+  const { settings } = useRailTrack();
+  const [summary, setSummary] = useState<TrainSummaryResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hasAttemptedLoad = useRef(false);
+  const delayData = summary?.trains.map((train) => ({
+    train: train.number,
+    minutes: train.delayMinutes,
+  })) ?? [];
+
+  const refreshSummary = useCallback(async () => {
+    if (!isBackendConfigured) {
+      setError(
+        "Backend URL is not configured. Set NEXT_PUBLIC_RAILTRACK_API_URL before building the frontend.",
+      );
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    const isInitialLoad = !hasAttemptedLoad.current;
+    hasAttemptedLoad.current = true;
+    setIsLoading(isInitialLoad);
+    setIsRefreshing(!isInitialLoad);
+    setError(null);
+
+    try {
+      setSummary(await railTrackApi.getTrainSummary());
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initialLoadId = window.setTimeout(() => {
+      void refreshSummary();
+    }, 0);
+    if (!settings.autoRefresh || !isBackendConfigured) {
+      return () => window.clearTimeout(initialLoadId);
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshSummary();
+    }, 10_000);
+    return () => {
+      window.clearTimeout(initialLoadId);
+      window.clearInterval(intervalId);
+    };
+  }, [refreshSummary, settings.autoRefresh]);
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="h-56">
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-500">Punctuality · 7 days</p>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={punctualityTrend}>
-            <defs>
-              <linearGradient id="onTimeFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="day" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis hide />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Area type="monotone" dataKey="onTime" stroke="#22d3ee" fill="url(#onTimeFill)" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="h-56">
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-500">Grid load by hour</p>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={hourlyTraffic}>
-            <XAxis dataKey="hour" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis hide />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Bar dataKey="running" fill="#38bdf8" radius={[6, 6, 0, 0]} />
-            <Bar dataKey="delayed" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-cyan-400/10 bg-[#08101f]/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-white">Java-generated train summary</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Java API response · {settings.autoRefresh ? "refreshes every 10 seconds" : "manual refresh"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshSummary()}
+            disabled={isLoading || isRefreshing || !isBackendConfigured}
+            className="rounded-lg border border-cyan-400/20 px-3 py-1.5 text-xs text-cyan-200 transition hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoading ? "Loading…" : isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+
+        {error ? (
+          <p role="alert" className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3 py-2 text-xs text-amber-200">
+            {error}{summary ? " Showing the last successful backend response." : ""}
+          </p>
+        ) : null}
+
+        {isLoading ? (
+          <p role="status" className="mt-4 text-sm text-slate-400">Loading train summary…</p>
+        ) : summary ? (
+          <>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryMetric
+                label="Valid trains"
+                value={`${summary.validTrains} / ${summary.totalTrains}`}
+                detail={`${summary.invalidTrains} invalid records`}
+              />
+              <SummaryMetric
+                label="Train status"
+                value={`${summary.onTimeTrains} on time · ${summary.delayedTrains} delayed`}
+                detail={`${summary.cancelledTrains} cancelled · ${summary.arrivedTrains} arrived`}
+              />
+              <SummaryMetric
+                label="Total delay"
+                value={`${summary.totalDelayMinutes} min`}
+                detail={`Average ${summary.averageDelayMinutes.toFixed(1)} min`}
+              />
+              <SummaryMetric
+                label="Maximum delay"
+                value={`${summary.maximumDelayMinutes} min`}
+                detail="Across valid train records"
+              />
+            </div>
+
+            <div className="mt-4 border-t border-white/5 pt-4">
+              <p className="mb-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                Per-train status
+              </p>
+              {summary.trains.length ? (
+                <ul className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                  {summary.trains.map((train) => (
+                    <li
+                      key={train.id}
+                      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-white/[0.03] px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm text-slate-200">
+                          {train.number} · {train.name}
+                        </p>
+                        <p className="text-xs text-slate-400">{train.summary}</p>
+                      </div>
+                      <span className="text-xs capitalize text-cyan-200">{train.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-400">The backend returned no valid train records.</p>
+              )}
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      {summary ? (
+        <div className="h-56">
+          <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-500">Recorded delay by train · Java API</p>
+          {delayData.length ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={delayData}>
+                <XAxis dataKey="train" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis hide />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="minutes" name="Delay (minutes)" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-slate-400">No valid train records were returned for this summary.</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-white">{value}</p>
+      <p className="mt-1 text-xs text-slate-400">{detail}</p>
     </div>
   );
 }

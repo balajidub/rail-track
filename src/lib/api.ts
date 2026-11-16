@@ -41,6 +41,29 @@ export interface RouteComparison {
   notice: string;
 }
 
+export interface TrainStatusSummary {
+  id: string;
+  number: string;
+  name: string;
+  status: TrainStatus;
+  delayMinutes: number;
+  summary: string;
+}
+
+export interface TrainSummaryResponse {
+  totalTrains: number;
+  validTrains: number;
+  invalidTrains: number;
+  onTimeTrains: number;
+  delayedTrains: number;
+  cancelledTrains: number;
+  arrivedTrains: number;
+  totalDelayMinutes: number;
+  averageDelayMinutes: number;
+  maximumDelayMinutes: number;
+  trains: TrainStatusSummary[];
+}
+
 export const isBackendConfigured = Boolean(API_BASE_URL);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -124,6 +147,10 @@ export const railTrackApi = {
   async getTrains(): Promise<Train[]> {
     const result = await request<ApiTrain[]>("/api/trains");
     return result.map(mapTrain);
+  },
+
+  getTrainSummary(): Promise<TrainSummaryResponse> {
+    return request<TrainSummaryResponse>("/api/train-summary");
   },
 
   async getStations(): Promise<Station[]> {

@@ -25,7 +25,7 @@ export function StationsView() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-cyan-300/80">Stations</p>
         <h1 className="mt-1 text-3xl font-semibold text-white">Junction directory</h1>
-        <p className="mt-1 text-sm text-slate-400">Fictional control nodes with live mock occupancy.</p>
+        <p className="mt-1 text-sm text-slate-400">Station information returned by the configured backend.</p>
       </div>
 
       <GlassCard>
@@ -38,6 +38,13 @@ export function StationsView() {
       </GlassCard>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {rows.length === 0 ? (
+          <GlassCard className="md:col-span-2 xl:col-span-3">
+            <p className="text-sm text-slate-400">
+              {stations.length === 0 ? "No backend station records are available." : "No stations match your search."}
+            </p>
+          </GlassCard>
+        ) : null}
         {rows.map((station) => {
           const nearby = trainsAtStation(trains, station.id);
           return (
@@ -61,7 +68,7 @@ export function StationsView() {
               </div>
               <div className="mt-4 space-y-2">
                 {nearby.length === 0 ? (
-                  <p className="text-xs text-slate-500">No mock services currently at this node.</p>
+                  <p className="text-xs text-slate-500">No services are reported at this station.</p>
                 ) : (
                   nearby.slice(0, 3).map((train) => (
                     <button

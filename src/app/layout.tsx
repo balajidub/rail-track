@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RailTrack: Real-Time Train Tracking and Live Status Visualization System",
-  description: "Premium fictional railway tracking dashboard for Indian rail corridors.",
+  title: "RailTrack | Railway Operations Dashboard",
+  description: "Train, station, delay, and incident records from the configured RailTrack backend.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

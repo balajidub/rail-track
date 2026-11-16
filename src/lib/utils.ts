@@ -17,41 +17,8 @@ export function stationById(stations: Station[], id: string) {
 }
 
 export function trainPosition(train: Train, stations: Station[]) {
-  const points = train.stops
-    .map((stop) => stationById(stations, stop.stationId))
-    .filter((station): station is Station => Boolean(station))
-    .map((station) => ({ lat: station.lat, lng: station.lng }));
-
-  return interpolate(points, train.progress);
-}
-
-export function interpolate(
-  points: Array<{ lat: number; lng: number }>,
-  t: number,
-) {
-  if (points.length === 0) return { lat: 22.5, lng: 79 };
-  if (points.length === 1) return points[0];
-
-  const clamped = Math.min(1, Math.max(0, t));
-  const scaled = clamped * (points.length - 1);
-  const index = Math.min(Math.floor(scaled), points.length - 2);
-  const fraction = scaled - index;
-  const start = points[index];
-  const end = points[index + 1];
-
-  return {
-    lat: start.lat + (end.lat - start.lat) * fraction,
-    lng: start.lng + (end.lng - start.lng) * fraction,
-  };
-}
-
-export function currentAndNextStop(train: Train) {
-  const total = Math.max(train.stops.length - 1, 1);
-  const index = Math.min(Math.floor(train.progress * total), train.stops.length - 1);
-  return {
-    current: train.stops[index],
-    next: train.stops[Math.min(index + 1, train.stops.length - 1)],
-  };
+  const station = stationById(stations, train.currentStationId);
+  return station ? { lat: station.lat, lng: station.lng } : null;
 }
 
 export function etaForTrain(train: Train) {
