@@ -66,4 +66,4 @@ rule-based simulations and are not trained AI predictions or live railway inform
 
 ## Deployment
 
-The GitHub Actions workflow builds a static export and deploys it to GitHub Pages when changes are pushed to `master`. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+The GitHub Actions workflow builds a static export and deploys it to GitHub Pages when changes are pushed to `main`. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
