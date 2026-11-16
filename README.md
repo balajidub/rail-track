@@ -46,6 +46,21 @@ Set `RAILTRACK_CORS_ALLOWED_ORIGINS` to a comma-separated list of trusted fronte
 The frontend is a static GitHub Pages export, so the backend must be hosted separately; configure the frontend API URL
 at build time. For GitHub Pages builds, set the repository Actions variable `RAILTRACK_API_URL` to the backend origin.
 
+## Deploy the backend on Railway
+
+Create a Railway project from this repository on `main`, add a MySQL service, and add the backend service with its root
+directory set to `/backend`. Railway will build `backend/Dockerfile`. In the backend service variables, map the MySQL
+service's `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, and `MYSQLPASSWORD` values to:
+
+- `DB_URL`: `jdbc:mysql://<MYSQLHOST>:<MYSQLPORT>/<MYSQLDATABASE>?serverTimezone=UTC`
+- `DB_USERNAME`: the MySQL service's `MYSQLUSER`
+- `DB_PASSWORD`: the MySQL service's `MYSQLPASSWORD`
+- `RAILTRACK_CORS_ALLOWED_ORIGINS`: `https://balajidub.github.io`
+
+Keep database credentials in Railway variables, not in this repository. Generate a public domain for the backend and
+verify that `<backend-origin>/api/health` responds. Then set the GitHub Actions variable `RAILTRACK_API_URL` to that
+backend origin (without an `/api` suffix) and run the Pages workflow on `main` to rebuild the frontend with the API URL.
+
 Train and station reads are available at `GET /api/trains`, `GET /api/trains/{id}`,
 `GET /api/trains/search?q=...`, `GET /api/trains/{id}/stops`, `GET /api/stations`, and
 `GET /api/stations/{id}`. The V2 simulation APIs include:
